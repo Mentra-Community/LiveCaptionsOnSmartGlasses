@@ -74,50 +74,6 @@ bun run lint
 bun run sh
 ```
 
-## Production
-
-### Building and Running for Production
-
-```bash
-# Build the production Docker image
-bun run image:build
-
-# Start the production container
-bun run prod
-
-# Start in detached mode
-bun run prod:detach
-
-# Stop the production container
-bun run prod:stop
-```
-
-### Container Registry
-
-You can push images to Docker Hub or GitHub Container Registry:
-
-```bash
-# Docker Hub
-bun run image:release
-
-# GitHub Container Registry
-bun run ghcr:release
-```
-
-## Project Structure
-
-```
-.
-├── docker/               # Docker configuration files
-│   ├── Dockerfile        # Production Dockerfile
-│   ├── Dockerfile.dev    # Development Dockerfile
-│   └── docker-compose.*  # Docker Compose files
-├── scripts/              # Development and utility scripts
-├── src/                  # Source code
-│   └── index.ts          # Application entry point
-└── tsconfig.json         # TypeScript configuration
-```
-
 ## License
 
 See the [LICENSE](LICENSE) file for details.
