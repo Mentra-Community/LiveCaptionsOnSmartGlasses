@@ -17,5 +17,6 @@ RUN bun run build
 # Expose the port
 EXPOSE 80
 
-# Start the application
-CMD ["bun", "start"]
+# Ready to start the application
+CMD ["echo", "Ready to run services"]
+# CMD ["bun", "start"]

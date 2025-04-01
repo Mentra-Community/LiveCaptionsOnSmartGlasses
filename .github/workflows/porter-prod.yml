@@ -1,8 +1,8 @@
 "on":
     push:
         branches:
-            - dev
-name: "[dev] 🚀 Deploy to Porter.run"
+            - main
+name: "[prod] 🚀 Deploy to Porter.run"
 jobs:
     porter-deploy:
         runs-on: ubuntu-latest
@@ -18,9 +18,9 @@ jobs:
               timeout-minutes: 30
               run: exec porter apply -f ./porter.yaml
               env:
-                PORTER_APP_NAME: live-captions-dev
-                PORTER_NAMESPACE: dev
-                NODE_ENV: development
+                PORTER_APP_NAME: live-captions-prod
+                PORTER_NAMESPACE: prod
+                NODE_ENV: production
                 PORTER_CLUSTER: "4689"
                 PORTER_DEPLOYMENT_TARGET_ID: 4a24a192-04c8-421f-8fc2-22db1714fdc0
                 PORTER_HOST: https://dashboard.porter.run
