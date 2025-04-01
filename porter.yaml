@@ -10,7 +10,7 @@ build:
 services:
   - name: live-captions
     type: web
-    run: bun dist/index.js
+    run: bun run start
     port: 80
     cpuCores: 1.0
     ramMegabytes: 1024

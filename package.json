@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "main": "dist/index.js",
   "scripts": {
-    
     "dev": "bun --hot src/index.ts",
     "docker:dev": "./scripts/docker-dev.sh",
     "docker:dev:detach": "./scripts/docker-dev.sh -d",
