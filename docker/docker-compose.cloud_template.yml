@@ -1,0 +1,30 @@
+services:
+  live-captions:
+    image: ${CONTAINER_REGISTRY:-ghcr.io/augmentos}/live-captions:${TAG:-latest}
+    container_name: live-captions
+    ports:
+      - "8080:80"
+    environment:
+      - PORT=80
+      - CLOUD_HOST_NAME=${CLOUD_HOST_NAME:-cloud}
+      - NODE_ENV=production
+      # Add any additional environment variables needed for production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - augmentos-network
+
+networks:
+  augmentos-network:
+    name: augmentos-network
+    external: true

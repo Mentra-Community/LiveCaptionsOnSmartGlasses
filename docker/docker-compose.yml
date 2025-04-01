@@ -1,0 +1,24 @@
+services:
+  live-captions:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: live-captions
+    ports:
+      - "8090:80"
+    environment:
+      - PORT=80
+      - CLOUD_HOST_NAME=cloud
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

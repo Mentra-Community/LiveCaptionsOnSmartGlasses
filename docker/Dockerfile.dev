@@ -1,0 +1,20 @@
+FROM oven/bun:1.0
+
+WORKDIR /app
+
+# Copy package files first for better layer caching
+COPY package.json bun.lock* ./
+
+# Copy setup script
+COPY scripts/setup-dev.sh ./scripts/setup-dev.sh
+RUN chmod +x ./scripts/setup-dev.sh
+
+# Run setup script to install dependencies 
+# It will automatically use the published version in Docker
+RUN ./scripts/setup-dev.sh
+
+# Expose the port
+EXPOSE 80
+
+# Note: Command is provided in docker-compose.dev.yml
+CMD ["bun", "--hot", "src/index.ts"]
