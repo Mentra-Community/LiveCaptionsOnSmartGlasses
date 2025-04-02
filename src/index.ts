@@ -12,10 +12,21 @@ import axios from 'axios';
 
 // Configuration constants
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 80;
-const CLOUD_HOST_NAME = process.env.CLOUD_HOST_NAME || "cloud";
-const PACKAGE_NAME = "com.augmentos.livecaptions";
-const API_KEY = 'test_key'; // In production, this would be securely stored
+const CLOUD_HOST_NAME = process.env.CLOUD_HOST_NAME || "prod.augmentos.org"; // Default to production server.
+const PACKAGE_NAME = process.env.PACKAGE_NAME; // must be the same package name from the developer console: i.e: com.augmentos.livecaptions
+const AUGMENTOS_API_KEY = process.env.AUGMENTOS_API_KEY; // Create an API key in the AugmentOS console and set it here. https://console.augmentos.org
 const MAX_FINAL_TRANSCRIPTS = 5;
+
+// Verify env vars are set.
+if (!AUGMENTOS_API_KEY) {
+  throw new Error('AUGMENTOS_API_KEY environment variable is required.');
+}
+if (!PACKAGE_NAME) {
+  throw new Error('PACKAGE_NAME environment variable is required.');
+}
+if (!CLOUD_HOST_NAME) {
+  throw new Error('CLOUD_HOST_NAME environment variable is required.');
+}
 
 // User transcript processors map
 const userTranscriptProcessors: Map<string, TranscriptProcessor> = new Map();
@@ -35,11 +46,10 @@ class LiveCaptionsApp extends TpaServer {
 
   constructor() {
     super({
-      packageName: PACKAGE_NAME,
-      apiKey: API_KEY,
+      packageName: PACKAGE_NAME as string,
+      apiKey: AUGMENTOS_API_KEY as string,
       port: PORT,
       publicDir: path.join(__dirname, './public'),
-      // augmentOSWebsocketUrl: `ws://${CLOUD_HOST_NAME}/tpa-ws`
     });
   }
 
@@ -94,7 +104,7 @@ class LiveCaptionsApp extends TpaServer {
    */
   private async fetchAndApplySettings(session: TpaSession, userId: string): Promise<void> {
     try {
-      const response = await axios.get(`http://${CLOUD_HOST_NAME}/tpasettings/user/${PACKAGE_NAME}`, {
+      const response = await axios.get(`https://${CLOUD_HOST_NAME}/tpasettings/user/${PACKAGE_NAME}`, {
         headers: { Authorization: `Bearer ${userId}` }
       });
       
