@@ -14,8 +14,8 @@ import axios from 'axios';
 // Configuration constants
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 80;
 const CLOUD_HOST_NAME = process.env.CLOUD_HOST_NAME || "cloud";
-const PACKAGE_NAME = "com.augmentos.livecaptions";
-const API_KEY = 'test_key'; // In production, this would be securely stored
+const PACKAGE_NAME = process.env.PACKAGE_NAME || "com.augmentos.livecaptions";
+const AUGMENTOS_API_KEY = process.env.AUGMENTOS_API_KEY || 'test_key'; // In production, this would be securely stored
 const MAX_FINAL_TRANSCRIPTS = 5;
 
 // User transcript processors map
@@ -41,7 +41,7 @@ class LiveCaptionsApp extends TpaServer {
   constructor() {
     super({
       packageName: PACKAGE_NAME,
-      apiKey: API_KEY,
+      apiKey: AUGMENTOS_API_KEY,
       port: PORT,
       publicDir: path.join(__dirname, './public'),
       // augmentOSWebsocketUrl: `ws://${CLOUD_HOST_NAME}/tpa-ws`
