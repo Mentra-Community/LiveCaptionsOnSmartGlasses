@@ -4,7 +4,7 @@
     "": {
       "name": "@augmentos/livecaptions",
       "dependencies": {
-        "@augmentos/sdk": "^1.1.1",
+        "@augmentos/sdk": "^1.1.2",
         "@types/express": "^5.0.1",
         "@types/node": "^22.13.14",
         "@types/ws": "^8.18.0",
@@ -18,7 +18,7 @@
     },
   },
   "packages": {
-    "@augmentos/sdk": ["@augmentos/sdk@1.1.1", "", { "dependencies": { "axios": "^1.8.1", "express": "^4.18.2", "jsonwebtoken": "^8.5.1" } }, "sha512-1C4NlF0yhw96/NuvqDlvtA4/3sE9p+BCqszk8SroUKAuSF1hkuLKj5O12Bg0Q1zGuaIS+Cdp0oEYk0UFEDAs2g=="],
+    "@augmentos/sdk": ["@augmentos/sdk@1.1.2", "", { "dependencies": { "axios": "^1.8.1", "express": "^4.18.2", "jsonwebtoken": "^8.5.1" } }, "sha512-fjoHbJlRdR19/1ij8Oiwp/8IdPfAqufiE+vb1jgdTR7vHNrsxMkliXYvAF3nS6eVJ20lVQGdlJUDvS8jj6t34Q=="],
 
     "@types/body-parser": ["@types/body-parser@1.19.5", "", { "dependencies": { "@types/connect": "*", "@types/node": "*" } }, "sha512-fB3Zu92ucau0iQ0JMCFQE7b/dv8Ot07NI3KaZIkIUNXq82k4eBAqUaneXfleGY9JWskeS9y+u0nXMyspcuQrCg=="],
 
