@@ -12,9 +12,9 @@ import axios from 'axios';
 
 // Configuration constants
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 80;
-const CLOUD_HOST_NAME = process.env.CLOUD_HOST_NAME || "prod.augmentos.org"; // Default to production server.
-const PACKAGE_NAME = process.env.PACKAGE_NAME; // must be the same package name from the developer console: i.e: com.augmentos.livecaptions
-const AUGMENTOS_API_KEY = process.env.AUGMENTOS_API_KEY; // Create an API key in the AugmentOS console and set it here. https://console.augmentos.org
+const CLOUD_HOST_NAME = process.env.CLOUD_HOST_NAME;
+const PACKAGE_NAME = process.env.PACKAGE_NAME;
+const AUGMENTOS_API_KEY = process.env.AUGMENTOS_API_KEY; // In production, this would be securely stored
 const MAX_FINAL_TRANSCRIPTS = 5;
 
 // Verify env vars are set.

@@ -6,8 +6,8 @@
     "dev": "bun --hot src/index.ts",
     "docker:dev": "./scripts/docker-dev.sh",
     "docker:dev:detach": "./scripts/docker-dev.sh -d",
-    "docker:stop": "docker-compose -f docker/docker-compose.dev.yml -p dev down",
-    "docker:build": "docker-compose -f docker/docker-compose.dev.yml -p dev build",
+    "docker:stop": "docker compose -f docker/docker-compose.dev.yml -p dev down",
+    "docker:build": "docker compose -f docker/docker-compose.dev.yml -p dev build",
     
     "build": "bun build ./src/index.ts --outdir ./dist --target bun",
     "start": "bun dist/index.js",
@@ -24,10 +24,10 @@
     "exec": "docker exec -it live-captions-dev",
     "sh": "docker exec -it live-captions-dev bash",
     
-    "prod": "docker-compose -f docker/docker-compose.yml up",
-    "prod:detach": "docker-compose -f docker/docker-compose.yml up -d",
-    "prod:stop": "docker-compose -f docker/docker-compose.yml down",
-    "prod:build": "docker-compose -f docker/docker-compose.yml build",
+    "prod": "docker compose -f docker/docker-compose.yml up",
+    "prod:detach": "docker compose -f docker/docker-compose.yml up -d",
+    "prod:stop": "docker compose -f docker/docker-compose.yml down",
+    "prod:build": "docker compose -f docker/docker-compose.yml build",
     
     "image:build": "docker build -t augmentos/live-captions:latest -t augmentos/live-captions:$npm_package_version -f docker/Dockerfile .",
     "image:push": "docker push augmentos/live-captions:latest && docker push augmentos/live-captions:$npm_package_version",

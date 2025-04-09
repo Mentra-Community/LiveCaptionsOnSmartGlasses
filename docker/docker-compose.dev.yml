@@ -9,14 +9,11 @@ services:
     volumes:
       - ../src:/app/src:delegated
       - ../scripts:/app/scripts:delegated
-      # Conditional SDK volume (will be ignored if path doesn't exist)
       - ${SDK_PATH:-/dev/null}:/app/node_modules/@augmentos/sdk:delegated
-      # Don't sync other node_modules back to host
       - /app/node_modules
     environment:
       - PORT=80
       - NODE_ENV=development
-      - CLOUD_HOST_NAME=cloud
     command: ["bun", "--hot", "src/index.ts"]
     restart: "no"
     stdin_open: true

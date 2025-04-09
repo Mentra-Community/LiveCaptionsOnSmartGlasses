@@ -41,4 +41,4 @@ fi
 
 # Run docker-compose
 echo "Starting Docker container..."
-docker-compose -f docker/docker-compose.dev.yml -p dev up "$@"
+docker compose -f docker/docker-compose.dev.yml -p dev up "$@"
