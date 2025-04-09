@@ -43,6 +43,8 @@ interface TranscriptDebouncer {
 class LiveCaptionsApp extends TpaServer {
   // Session debouncers for throttling non-final transcripts
   private sessionDebouncers = new Map<string, TranscriptDebouncer>();
+  // Track active sessions by user ID
+  private activeUserSessions = new Map<string, { session: TpaSession, sessionId: string }>();
 
   constructor() {
     super({
@@ -61,6 +63,8 @@ class LiveCaptionsApp extends TpaServer {
 
     // Initialize transcript processor and debouncer for this session
     this.sessionDebouncers.set(sessionId, { lastSentTime: 0, timer: null });
+    // Store the active session for this user
+    this.activeUserSessions.set(userId, { session, sessionId });
 
     try {
       // Fetch and apply user settings (language, line width, etc.)
@@ -97,6 +101,12 @@ class LiveCaptionsApp extends TpaServer {
       clearTimeout(debouncer.timer);
     }
     this.sessionDebouncers.delete(sessionId);
+    
+    // Remove active session if it matches this session ID
+    const activeSession = this.activeUserSessions.get(userId);
+    if (activeSession && activeSession.sessionId === sessionId) {
+      this.activeUserSessions.delete(userId);
+    }
   }
 
   /**
@@ -310,8 +320,17 @@ class LiveCaptionsApp extends TpaServer {
 
       // Apply changes to active sessions for this user
       let sessionsRefreshed = false;
-      // Note: Since TpaServer abstracts sessions, we'd need to access its session map
-      // For now, we'll return success and let the TpaServer handle reconnection
+      
+      // Get active session for this user
+      const activeSession = this.activeUserSessions.get(userId);
+      if (activeSession) {
+        // Show the updated transcript layout immediately with the new formatting
+        this.showTranscriptsToUser(activeSession.session, displayText, true);
+        sessionsRefreshed = true;
+        console.log(`Updated display for active session ${activeSession.sessionId} for user ${userId}`);
+      } else {
+        console.log(`No active session found for user ${userId}, can't update display`);
+      }
       
       return {
         status: 'Settings updated successfully',
@@ -323,6 +342,13 @@ class LiveCaptionsApp extends TpaServer {
       console.error('Error updating settings:', error);
       throw error;
     }
+  }
+  
+  /**
+   * Helper method to get active session for a user
+   */
+  public getActiveSessionForUser(userId: string): { session: TpaSession, sessionId: string } | null {
+    return this.activeUserSessions.get(userId) || null;
   }
 }
 
