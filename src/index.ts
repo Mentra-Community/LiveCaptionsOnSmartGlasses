@@ -17,7 +17,7 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT) : 80;
 const CLOUD_HOST_NAME = process.env.CLOUD_HOST_NAME;
 const PACKAGE_NAME = process.env.PACKAGE_NAME;
 const AUGMENTOS_API_KEY = process.env.AUGMENTOS_API_KEY; // In production, this would be securely stored
-const MAX_FINAL_TRANSCRIPTS = 5;
+const MAX_FINAL_TRANSCRIPTS = 10;
 
 // Verify env vars are set.
 if (!AUGMENTOS_API_KEY) {
