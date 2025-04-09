@@ -351,11 +351,24 @@ class LiveCaptionsApp extends TpaServer {
     transcript: string,
     isFinal: boolean
   ): void {
-    session.layouts.showTextWall(transcript, {
+    const cleanedTranscript = this.cleanTranscriptText(transcript);
+
+    session.layouts.showTextWall(cleanedTranscript, {
       view: ViewType.MAIN,
       // Use a fixed duration for final transcripts (20 seconds)
       durationMs: isFinal ? 20000 : undefined,
     });
+  }
+
+  /**
+   * Cleans the transcript text by removing leading punctuation while preserving Spanish question marks
+   * and Chinese characters
+   */
+  private cleanTranscriptText(text: string): string {
+    // Remove basic punctuation marks (both Western and Chinese)
+    // Western: . , ; : ! ?
+    // Chinese: 。 ， ； ： ！ ？
+    return text.replace(/^[.,;:!?。，；：！？]+/, '').trim();
   }
 
   /**
