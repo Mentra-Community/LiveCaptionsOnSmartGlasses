@@ -182,14 +182,14 @@ class LiveCaptionsApp extends TpaServer {
       // Store the current language
       userActiveLanguages.set(userId, language);
 
-      console.log(`User ${userId} has language ${language}`);
+      // console.log(`User ${userId} has language ${language}`);
 
       // Process line width
       let lineWidth = 30; // default
 
       const isChineseLanguage = language === 'Chinese (Hanzi)';
       
-      console.log(`User ${userId} has isChineseLanguage ${isChineseLanguage}`);
+      // console.log(`User ${userId} has isChineseLanguage ${isChineseLanguage}`);
 
       if (lineWidthSetting) {
         lineWidth = convertLineWidth(lineWidthSetting.value, isChineseLanguage);
@@ -408,7 +408,7 @@ class LiveCaptionsApp extends TpaServer {
       let lineWidth = 30; // default
       const isChineseLanguage = language === 'Chinese (Hanzi)';
 
-      console.log(`User ${userId} has isChineseLanguage ${isChineseLanguage}`);
+      // console.log(`User ${userId} has isChineseLanguage ${isChineseLanguage}`);
 
       if (lineWidthSetting) {
         lineWidth = convertLineWidth(lineWidthSetting.value, isChineseLanguage);

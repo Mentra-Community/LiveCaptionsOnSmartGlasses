@@ -13,6 +13,29 @@ export function isChinese(text: string): boolean {
 }
 
 /**
+ * Finds the last valid word boundary before or at the given position in Chinese text
+ * Returns the position where the text should be split
+ */
+export function findChineseWordBoundary(text: string, position: number): number {
+  if (!isChinese(text)) return position;
+  
+  // Get all words up to the position
+  const words = jieba.cut(text);
+  let currentLength = 0;
+  
+  for (const word of words) {
+    if (currentLength + word.length > position) {
+      // If this word would exceed the position, return the previous position
+      return currentLength;
+    }
+    currentLength += word.length;
+  }
+  
+  // If we didn't find a boundary, return the original position
+  return position;
+}
+
+/**
  * Converts Chinese text to Pinyin format
  * Preserves word boundaries and keeps multi-character words together
  */

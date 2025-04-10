@@ -1,3 +1,5 @@
+import { findChineseWordBoundary } from '../ChineseUtils';
+
 export class TranscriptProcessor {
   private maxCharsPerLine: number;
   private maxLines: number;
@@ -172,8 +174,12 @@ export class TranscriptProcessor {
         break;
       } else {
         let splitIndex = maxLineLength;
-        // move splitIndex left until we find a space
-        if (!this.isChinese) {          
+        
+        if (this.isChinese) {
+          // For Chinese text, find the last valid word boundary
+          splitIndex = findChineseWordBoundary(text, maxLineLength);
+        } else {
+          // For non-Chinese text, find the last space before maxLineLength
           while (splitIndex > 0 && text.charAt(splitIndex) !== " ") {
             splitIndex--;
           }
