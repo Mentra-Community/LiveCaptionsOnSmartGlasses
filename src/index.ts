@@ -182,10 +182,15 @@ class LiveCaptionsApp extends TpaServer {
       // Store the current language
       userActiveLanguages.set(userId, language);
 
+      console.log(`User ${userId} has language ${language}`);
+
       // Process line width
       let lineWidth = 30; // default
-      const isChineseLanguage = locale.toLowerCase().startsWith('zh-') || locale.toLowerCase().startsWith('ja-');
+
+      const isChineseLanguage = language === 'Chinese (Hanzi)';
       
+      console.log(`User ${userId} has isChineseLanguage ${isChineseLanguage}`);
+
       if (lineWidthSetting) {
         lineWidth = convertLineWidth(lineWidthSetting.value, isChineseLanguage);
       } else if (isChineseLanguage) {
@@ -401,8 +406,11 @@ class LiveCaptionsApp extends TpaServer {
 
       // Process other settings
       let lineWidth = 30; // default
+      const isChineseLanguage = language === 'Chinese (Hanzi)';
+
+      console.log(`User ${userId} has isChineseLanguage ${isChineseLanguage}`);
+
       if (lineWidthSetting) {
-        const isChineseLanguage = language.startsWith('zh-') || language.startsWith('ja-');
         lineWidth = convertLineWidth(lineWidthSetting.value, isChineseLanguage);
       }
 
@@ -421,7 +429,7 @@ class LiveCaptionsApp extends TpaServer {
         lineWidth, 
         numberOfLines, 
         MAX_FINAL_TRANSCRIPTS,
-        language
+        isChineseLanguage
       );
 
       // Preserve transcript history if language didn't change
