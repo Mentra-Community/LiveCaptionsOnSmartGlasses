@@ -1,0 +1,3 @@
+[submodule "jieba-ts"]
+	path = jieba-ts
+	url = https://github.com/monkingxue/jieba-ts.git
