@@ -8,42 +8,37 @@
     "docker:dev:detach": "./scripts/docker-dev.sh -d",
     "docker:stop": "docker compose -f docker/docker-compose.dev.yml -p dev down",
     "docker:build": "docker compose -f docker/docker-compose.dev.yml -p dev build",
-    
     "build": "bun build ./src/index.ts --outdir ./dist --target bun",
     "start": "bun dist/index.js",
-    
     "add": "docker exec -it live-captions-dev bun add",
     "add:dev": "docker exec -it live-captions-dev bun add -d",
     "remove": "docker exec -it live-captions-dev bun remove",
-    
     "test": "docker exec -it live-captions-dev bun test",
     "lint": "docker exec -it live-captions-dev npx eslint 'src/**/*.ts'",
-    
     "logs": "docker logs -f live-captions-dev",
     "restart": "docker restart live-captions-dev",
     "exec": "docker exec -it live-captions-dev",
     "sh": "docker exec -it live-captions-dev bash",
-    
     "prod": "docker compose -f docker/docker-compose.yml up",
     "prod:detach": "docker compose -f docker/docker-compose.yml up -d",
     "prod:stop": "docker compose -f docker/docker-compose.yml down",
     "prod:build": "docker compose -f docker/docker-compose.yml build",
-    
     "image:build": "docker build -t augmentos/live-captions:latest -t augmentos/live-captions:$npm_package_version -f docker/Dockerfile .",
     "image:push": "docker push augmentos/live-captions:latest && docker push augmentos/live-captions:$npm_package_version",
     "image:release": "npm run image:build && npm run image:push",
-    
     "ghcr:build": "docker build -t ghcr.io/augmentos/live-captions:latest -t ghcr.io/augmentos/live-captions:$npm_package_version -f docker/Dockerfile .",
     "ghcr:push": "docker push ghcr.io/augmentos/live-captions:latest && docker push ghcr.io/augmentos/live-captions:$npm_package_version",
     "ghcr:release": "npm run ghcr:build && npm run ghcr:push"
   },
   "dependencies": {
     "@augmentos/sdk": "^1.1.2",
+    "@node-rs/jieba": "^2.0.1",
     "@types/express": "^5.0.1",
     "@types/node": "^22.13.14",
     "@types/ws": "^8.18.0",
     "express": "^4.21.2",
     "path": "^0.12.7",
+    "pinyin-pro": "^3.26.0",
     "ws": "^8.18.1"
   },
   "devDependencies": {

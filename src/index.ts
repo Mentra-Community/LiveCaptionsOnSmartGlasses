@@ -10,6 +10,7 @@ import {
 } from '@augmentos/sdk';
 import { TranscriptProcessor, languageToLocale, convertLineWidth } from './utils';
 import axios from 'axios';
+import { convertToPinyin } from './utils/ChineseUtils';
 
 // Configuration constants
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 80;
@@ -164,7 +165,8 @@ class LiveCaptionsApp extends TpaServer {
       
       if (providedSettings) {
         // For updateSettings path
-        locale = languageToLocale(transcribeLanguageSetting?.value) || 'en-US';
+        language = transcribeLanguageSetting?.value || 'English';
+        locale = languageToLocale(language);
       } else {
         // For fetchAndApplySettings path
         language = transcribeLanguageSetting?.value || 'English';
@@ -173,12 +175,12 @@ class LiveCaptionsApp extends TpaServer {
 
       // Get previous processor to check for language changes and preserve history
       const previousTranscriptProcessor = userTranscriptProcessors.get(userId);
-      const previousLocale = userActiveLanguages.get(userId) || 'none';
+      const previousLanguage = userActiveLanguages.get(userId) || 'none';
       
-      const languageChanged = previousLocale !== 'none' && previousLocale !== locale;
+      const languageChanged = previousLanguage !== 'none' && previousLanguage !== language;
       
       // Store the current language
-      userActiveLanguages.set(userId, locale);
+      userActiveLanguages.set(userId, language);
 
       // Process line width
       let lineWidth = 30; // default
@@ -270,10 +272,18 @@ class LiveCaptionsApp extends TpaServer {
     }
 
     const isFinal = transcriptionData.isFinal;
-    const newTranscript = transcriptionData.text;
+    let newTranscript = transcriptionData.text;
     const language = transcriptionData.language;
 
     console.log(`[Session ${sessionId}]: Received transcription in language: ${language}`);
+
+    // Check if the language is Chinese and user has selected Pinyin format
+    const activeLanguage = userActiveLanguages.get(userId);
+    if (activeLanguage === 'Chinese (Pinyin)') {
+      const pinyinTranscript = convertToPinyin(newTranscript);
+      console.log(`[Session ${sessionId}]: Converting Chinese to Pinyin`);
+      newTranscript = pinyinTranscript;
+    }
 
     // Process the transcript
     transcriptProcessor.processString(newTranscript, isFinal);
@@ -386,7 +396,7 @@ class LiveCaptionsApp extends TpaServer {
       // Process language setting
       const language = languageToLocale(transcribeLanguageSetting?.value) || 'en-US';
       const previousTranscriptProcessor = userTranscriptProcessors.get(userId);
-      const previousLanguage = previousTranscriptProcessor?.getLanguage();
+      const previousLanguage = userActiveLanguages.get(userId) || 'none';
       const languageChanged = language !== previousLanguage;
 
       // Process other settings
