@@ -52,8 +52,8 @@ class LiveCaptionsApp extends TpaServer {
 
   constructor() {
     super({
-      packageName: PACKAGE_NAME,
-      apiKey: AUGMENTOS_API_KEY,
+      packageName: PACKAGE_NAME!,
+      apiKey: AUGMENTOS_API_KEY!,
       port: PORT,
       publicDir: path.join(__dirname, './public'),
     });

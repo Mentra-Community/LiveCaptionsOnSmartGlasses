@@ -3,7 +3,6 @@ import { findChineseWordBoundary } from '../ChineseUtils';
 export class TranscriptProcessor {
   private maxCharsPerLine: number;
   private maxLines: number;
-  private lines: string[];
   private partialText: string;
   private lastUserTranscript: string;
   private finalTranscriptHistory: string[]; // Array to store history of final transcripts
@@ -14,7 +13,6 @@ export class TranscriptProcessor {
     this.maxCharsPerLine = maxCharsPerLine;
     this.maxLines = maxLines;
     this.lastUserTranscript = "";
-    this.lines = [];
     this.partialText = "";
     this.finalTranscriptHistory = []; // Initialize empty history
     this.maxFinalTranscripts = maxFinalTranscripts; // Default to 3 if not specified
@@ -28,62 +26,57 @@ export class TranscriptProcessor {
       // Store this as the current partial text (overwriting old partial)
       this.partialText = newText;
       this.lastUserTranscript = newText;
-      return this.buildPreview(this.partialText);
+      
+      // For display consistency, get the combined transcript history plus current partial
+      const combinedText = this.getCombinedTranscriptHistory();
+      const displayText = combinedText ? combinedText + " " + this.partialText : this.partialText;
+      return this.getFormattedDisplay(displayText);
     } else {
-      // We have a final text -> clear out the partial text to avoid duplication
+      // Clear the partial text and add to transcript history
       this.partialText = "";
-
-      // Add to transcript history when it's a final transcript
       this.addToTranscriptHistory(newText);
 
-      // Return a formatted version of the full transcript history
-      return this.getFormattedTranscriptHistory();
+      // Return the formatted display with the same logic as partial
+      return this.getFormattedDisplay(this.getCombinedTranscriptHistory());
     }
+  }
+
+  // Unified display formatting method to ensure consistency
+  private getFormattedDisplay(text: string): string {
+    if (!text) return this.getEmptyDisplay();
+    
+    // Wrap the text consistently
+    const wrapped = this.wrapText(text, this.maxCharsPerLine);
+    
+    // Take only the last maxLines lines if there are more
+    const displayLines = wrapped.length > this.maxLines 
+      ? wrapped.slice(wrapped.length - this.maxLines) 
+      : wrapped;
+    
+    // Add padding to ensure exactly maxLines are displayed
+    const linesToPad = this.maxLines - displayLines.length;
+    for (let i = 0; i < linesToPad; i++) {
+      displayLines.push(""); // Add empty lines at the end
+    }
+    
+    return displayLines.join("\n");
+  }
+
+  // Returns empty display with proper line count
+  private getEmptyDisplay(): string {
+    const emptyLines = Array(this.maxLines).fill("");
+    return emptyLines.join("\n");
   }
 
   // New method to get formatted transcript history
   public getFormattedTranscriptHistory(): string {
-    if (this.finalTranscriptHistory.length === 0) {
-      return "";
-    }
-
-    // Combine all transcripts in history
-    const combinedText = this.finalTranscriptHistory.join(" ");
-    
-    // Wrap this combined text
-    const wrapped = this.wrapText(combinedText, this.maxCharsPerLine);
-    
-    // Take only the last maxLines lines if there are more
-    const displayLines = wrapped.length > this.maxLines 
-      ? wrapped.slice(wrapped.length - this.maxLines) 
-      : wrapped;
-    
-    // Add padding to ensure exactly maxLines are displayed
-    const linesToPad = this.maxLines - displayLines.length;
-    for (let i = 0; i < linesToPad; i++) {
-      displayLines.push(""); // Add empty lines at the end
-    }
-    
-    return displayLines.join("\n");
+    return this.getFormattedDisplay(this.getCombinedTranscriptHistory());
   }
 
   // Method to format partial transcript with history
   public getFormattedPartialTranscript(combinedText: string): string {
-    // Wrap the combined text
-    const wrapped = this.wrapText(combinedText, this.maxCharsPerLine);
-    
-    // Take only the last maxLines lines if there are more
-    const displayLines = wrapped.length > this.maxLines 
-      ? wrapped.slice(wrapped.length - this.maxLines) 
-      : wrapped;
-    
-    // Add padding to ensure exactly maxLines are displayed
-    const linesToPad = this.maxLines - displayLines.length;
-    for (let i = 0; i < linesToPad; i++) {
-      displayLines.push(""); // Add empty lines at the end
-    }
-    
-    return displayLines.join("\n");
+    // Use the unified formatting method
+    return this.getFormattedDisplay(combinedText);
   }
 
   // Add to transcript history
@@ -105,7 +98,7 @@ export class TranscriptProcessor {
 
   // Get combined transcript history as a single string
   public getCombinedTranscriptHistory(): string {
-    return this.finalTranscriptHistory.join(" ");
+    return this.finalTranscriptHistory.length > 0 ? this.finalTranscriptHistory.join(" ") : "";
   }
 
   // Method to set max final transcripts
@@ -120,50 +113,6 @@ export class TranscriptProcessor {
   // Get max final transcripts
   public getMaxFinalTranscripts(): number {
     return this.maxFinalTranscripts;
-  }
-
-  private buildPreview(partial: string): string {
-    // Wrap the partial text
-    const partialChunks = this.wrapText(partial, this.maxCharsPerLine);
-
-    // Combine with finalized lines
-    const combined = [...this.lines, ...partialChunks];
-
-    // Truncate if necessary
-    let finalCombined = combined;
-    if (combined.length > this.maxLines) {
-      finalCombined = combined.slice(combined.length - this.maxLines);
-    }
-
-    // Add padding to ensure exactly maxLines are displayed
-    const linesToPad = this.maxLines - finalCombined.length;
-    for (let i = 0; i < linesToPad; i++) {
-      finalCombined.push(""); // Add empty lines at the end
-    }
-
-    return finalCombined.join("\n");
-  }
-
-  private appendToLines(chunk: string): void {
-    if (this.lines.length === 0) {
-      this.lines.push(chunk);
-    } else {
-      const lastLine = this.lines.pop() as string;
-      const candidate = lastLine === "" ? chunk : lastLine + " " + chunk;
-
-      if (candidate.length <= this.maxCharsPerLine) {
-        this.lines.push(candidate);
-      } else {
-        // Put back the last line if it doesn't fit
-        this.lines.push(lastLine);
-        this.lines.push(chunk);
-      }
-    }
-
-    // Ensure we don't exceed maxLines
-    while (this.lines.length > this.maxLines) {
-      this.lines.shift();
-    }
   }
 
   private wrapText(text: string, maxLineLength: number): string[] {
@@ -198,20 +147,7 @@ export class TranscriptProcessor {
   }
 
   public getTranscript(): string {
-    // Create a copy of the lines for manipulation
-    const allLines = [...this.lines];
-
-    // Add padding to ensure exactly maxLines are displayed
-    const linesToPad = this.maxLines - allLines.length;
-    for (let i = 0; i < linesToPad; i++) {
-      allLines.push(""); // Add empty lines at the end
-    }
-
-    const finalString = allLines.join("\n");
-
-    // Clear the lines
-    this.lines = [];
-    return finalString;
+    return this.getFormattedDisplay(this.getCombinedTranscriptHistory());
   }
 
   public getLastUserTranscript(): string {
@@ -219,7 +155,6 @@ export class TranscriptProcessor {
   }
 
   public clear(): void {
-    this.lines = [];
     this.partialText = "";
     this.finalTranscriptHistory = [];
   }
