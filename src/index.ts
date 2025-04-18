@@ -17,7 +17,7 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT) : 80;
 const CLOUD_HOST_NAME = process.env.CLOUD_HOST_NAME;
 const PACKAGE_NAME = process.env.PACKAGE_NAME;
 const AUGMENTOS_API_KEY = process.env.AUGMENTOS_API_KEY; // In production, this would be securely stored
-const MAX_FINAL_TRANSCRIPTS = 10;
+const MAX_FINAL_TRANSCRIPTS = 30;
 
 // Verify env vars are set.
 if (!AUGMENTOS_API_KEY) {
@@ -225,7 +225,7 @@ class LiveCaptionsApp extends TpaServer {
 
       // Show the updated transcript layout immediately with the new formatting
       if (session) {
-        const formattedTranscript = newProcessor.getFormattedTranscriptHistory();
+        const formattedTranscript = newProcessor.processString("", true);
         this.showTranscriptsToUser(session, formattedTranscript, true);
       }
 
@@ -290,22 +290,8 @@ class LiveCaptionsApp extends TpaServer {
       newTranscript = pinyinTranscript;
     }
 
-    // Process the transcript
-    transcriptProcessor.processString(newTranscript, isFinal);
-
-    let textToDisplay;
-    if (isFinal) {
-      // Get formatted history for final transcripts
-      textToDisplay = transcriptProcessor.getFormattedTranscriptHistory();
-      console.log(`[Session ${sessionId}]: finalTranscriptCount=${transcriptProcessor.getFinalTranscriptHistory().length}`);
-    } else {
-      // For non-final, get combined history plus current partial transcript
-      const combinedTranscriptHistory = transcriptProcessor.getCombinedTranscriptHistory();
-      const textToProcess = `${combinedTranscriptHistory} ${newTranscript}`;
-      textToDisplay = transcriptProcessor.getFormattedPartialTranscript(textToProcess);
-    }
-
-    // Log and debounce the display
+    // Process the transcript and get the formatted text
+    const textToDisplay = transcriptProcessor.processString(newTranscript, isFinal);
     console.log(`[Session ${sessionId}]: ${textToDisplay}`);
     console.log(`[Session ${sessionId}]: isFinal=${isFinal}`);
 
