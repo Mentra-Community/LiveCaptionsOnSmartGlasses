@@ -1,3 +1,5 @@
+import { findChineseWordBoundary } from '../ChineseUtils';
+
 export class TranscriptProcessor {
   private maxCharsPerLine: number;
   private maxLines: number;
@@ -7,6 +9,7 @@ export class TranscriptProcessor {
   private finalTranscriptHistory: string[]; // Array to store history of final transcripts
   private maxFinalTranscripts: number; // Max number of final transcripts to keep
   private isChinese: boolean;
+  private currentDisplayLines: string[]; // Track current display lines to maintain consistency
 
   constructor(maxCharsPerLine: number, maxLines: number, maxFinalTranscripts: number = 3, isChinese: boolean = false) {
     this.maxCharsPerLine = maxCharsPerLine;
@@ -17,6 +20,7 @@ export class TranscriptProcessor {
     this.finalTranscriptHistory = []; // Initialize empty history
     this.maxFinalTranscripts = maxFinalTranscripts; // Default to 3 if not specified
     this.isChinese = isChinese;
+    this.currentDisplayLines = []; // Initialize display lines
   }
 
   public processString(newText: string | null, isFinal: boolean): string {
@@ -26,7 +30,20 @@ export class TranscriptProcessor {
       // Store this as the current partial text (overwriting old partial)
       this.partialText = newText;
       this.lastUserTranscript = newText;
-      return this.buildPreview(this.partialText);
+      
+      // Combine final history with new partial text
+      const combinedText = this.getCombinedTranscriptHistory() + " " + newText;
+      this.currentDisplayLines = this.wrapText(combinedText, this.maxCharsPerLine);
+      
+      // Ensure we have exactly maxLines
+      while (this.currentDisplayLines.length < this.maxLines) {
+        this.currentDisplayLines.push("");
+      }
+      while (this.currentDisplayLines.length > this.maxLines) {
+        this.currentDisplayLines.shift();
+      }
+      
+      return this.currentDisplayLines.join("\n");
     } else {
       // We have a final text -> clear out the partial text to avoid duplication
       this.partialText = "";
@@ -34,54 +51,20 @@ export class TranscriptProcessor {
       // Add to transcript history when it's a final transcript
       this.addToTranscriptHistory(newText);
 
-      // Return a formatted version of the full transcript history
-      return this.getFormattedTranscriptHistory();
+      // Use the same wrapping logic as partial to maintain consistency
+      const combinedText = this.getCombinedTranscriptHistory();
+      this.currentDisplayLines = this.wrapText(combinedText, this.maxCharsPerLine);
+      
+      // Ensure we have exactly maxLines
+      while (this.currentDisplayLines.length < this.maxLines) {
+        this.currentDisplayLines.push("");
+      }
+      while (this.currentDisplayLines.length > this.maxLines) {
+        this.currentDisplayLines.shift();
+      }
+      
+      return this.currentDisplayLines.join("\n");
     }
-  }
-
-  // New method to get formatted transcript history
-  public getFormattedTranscriptHistory(): string {
-    if (this.finalTranscriptHistory.length === 0) {
-      return "";
-    }
-
-    // Combine all transcripts in history
-    const combinedText = this.finalTranscriptHistory.join(" ");
-    
-    // Wrap this combined text
-    const wrapped = this.wrapText(combinedText, this.maxCharsPerLine);
-    
-    // Take only the last maxLines lines if there are more
-    const displayLines = wrapped.length > this.maxLines 
-      ? wrapped.slice(wrapped.length - this.maxLines) 
-      : wrapped;
-    
-    // Add padding to ensure exactly maxLines are displayed
-    const linesToPad = this.maxLines - displayLines.length;
-    for (let i = 0; i < linesToPad; i++) {
-      displayLines.push(""); // Add empty lines at the end
-    }
-    
-    return displayLines.join("\n");
-  }
-
-  // Method to format partial transcript with history
-  public getFormattedPartialTranscript(combinedText: string): string {
-    // Wrap the combined text
-    const wrapped = this.wrapText(combinedText, this.maxCharsPerLine);
-    
-    // Take only the last maxLines lines if there are more
-    const displayLines = wrapped.length > this.maxLines 
-      ? wrapped.slice(wrapped.length - this.maxLines) 
-      : wrapped;
-    
-    // Add padding to ensure exactly maxLines are displayed
-    const linesToPad = this.maxLines - displayLines.length;
-    for (let i = 0; i < linesToPad; i++) {
-      displayLines.push(""); // Add empty lines at the end
-    }
-    
-    return displayLines.join("\n");
   }
 
   // Add to transcript history
@@ -120,28 +103,6 @@ export class TranscriptProcessor {
     return this.maxFinalTranscripts;
   }
 
-  private buildPreview(partial: string): string {
-    // Wrap the partial text
-    const partialChunks = this.wrapText(partial, this.maxCharsPerLine);
-
-    // Combine with finalized lines
-    const combined = [...this.lines, ...partialChunks];
-
-    // Truncate if necessary
-    let finalCombined = combined;
-    if (combined.length > this.maxLines) {
-      finalCombined = combined.slice(combined.length - this.maxLines);
-    }
-
-    // Add padding to ensure exactly maxLines are displayed
-    const linesToPad = this.maxLines - finalCombined.length;
-    for (let i = 0; i < linesToPad; i++) {
-      finalCombined.push(""); // Add empty lines at the end
-    }
-
-    return finalCombined.join("\n");
-  }
-
   private appendToLines(chunk: string): void {
     if (this.lines.length === 0) {
       this.lines.push(chunk);
@@ -172,8 +133,12 @@ export class TranscriptProcessor {
         break;
       } else {
         let splitIndex = maxLineLength;
-        // move splitIndex left until we find a space
-        if (!this.isChinese) {          
+        
+        if (this.isChinese) {
+          // For Chinese text, find the last valid word boundary
+          splitIndex = findChineseWordBoundary(text, maxLineLength);
+        } else {
+          // For non-Chinese text, find the last space before maxLineLength
           while (splitIndex > 0 && text.charAt(splitIndex) !== " ") {
             splitIndex--;
           }
