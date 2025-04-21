@@ -9,6 +9,7 @@
     "docker:stop": "docker compose -f docker/docker-compose.dev.yml -p dev down",
     "docker:build": "docker compose -f docker/docker-compose.dev.yml -p dev build",
     "start": "bun src/index.ts",
+    "ngrok:isaiah": "ngrok http --url=isaiah-live-captions.ngrok.app 80",
     "add": "docker exec -it live-captions-dev bun add",
     "add:dev": "docker exec -it live-captions-dev bun add -d",
     "remove": "docker exec -it live-captions-dev bun remove",
