@@ -4,8 +4,6 @@ import {
   TpaSession,
   StreamType,
   ViewType,
-  createTranscriptionStream,
-  ExtendedStreamType,
   TranscriptionData,
 } from '@augmentos/sdk';
 import { TranscriptProcessor, languageToLocale, convertLineWidth } from './utils';
@@ -14,7 +12,7 @@ import { convertToPinyin } from './utils/ChineseUtils';
 
 // Configuration constants
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 80;
-const CLOUD_HOST_NAME = process.env.CLOUD_HOST_NAME;
+// const CLOUD_HOST_NAME = process.env.CLOUD_HOST_NAME;
 const PACKAGE_NAME = process.env.PACKAGE_NAME;
 const AUGMENTOS_API_KEY = process.env.AUGMENTOS_API_KEY; // In production, this would be securely stored
 const MAX_FINAL_TRANSCRIPTS = 30;
@@ -26,9 +24,9 @@ if (!AUGMENTOS_API_KEY) {
 if (!PACKAGE_NAME) {
   throw new Error('PACKAGE_NAME environment variable is required.');
 }
-if (!CLOUD_HOST_NAME) {
-  throw new Error('CLOUD_HOST_NAME environment variable is required.');
-}
+// if (!CLOUD_HOST_NAME) {
+//   throw new Error('CLOUD_HOST_NAME environment variable is required.');
+// }
 
 // User transcript processors map
 const userTranscriptProcessors: Map<string, TranscriptProcessor> = new Map();
@@ -72,8 +70,11 @@ class LiveCaptionsApp extends TpaServer {
     this.activeUserSessions.set(userId, { session, sessionId });
 
     try {
-      // Fetch and apply user settings (language, line width, etc.)
-      await this.processSettings(userId, session, sessionId);
+      // Set up settings change handlers
+      this.setupSettingsHandlers(session, sessionId, userId);
+      
+      // Apply initial settings
+      await this.applySettings(session, sessionId, userId);
 
     } catch (error) {
       console.error('Error initializing session:', error);
@@ -81,13 +82,121 @@ class LiveCaptionsApp extends TpaServer {
       const transcriptProcessor = new TranscriptProcessor(30, 3, MAX_FINAL_TRANSCRIPTS);
       userTranscriptProcessors.set(userId, transcriptProcessor);
       
-      // Subscribe with default language using the new method
+      // Subscribe with default language
       const cleanup = session.onTranscriptionForLanguage('en-US', (data: TranscriptionData) => {
         this.handleTranscription(session, sessionId, userId, data);
       });
       
       // Register cleanup handler
       this.addCleanupHandler(cleanup);
+    }
+  }
+
+  /**
+   * Set up handlers for settings changes
+   */
+  private setupSettingsHandlers(
+    session: TpaSession,
+    sessionId: string,
+    userId: string
+  ): void {
+    // Handle line width changes
+    session.settings.onValueChange('line_width', (newValue, oldValue) => {
+      console.log(`Line width changed for user ${userId}: ${oldValue} -> ${newValue}`);
+      this.applySettings(session, sessionId, userId);
+    });
+
+    // Handle number of lines changes
+    session.settings.onValueChange('number_of_lines', (newValue, oldValue) => {
+      console.log(`Number of lines changed for user ${userId}: ${oldValue} -> ${newValue}`);
+      this.applySettings(session, sessionId, userId);
+    });
+
+    // Handle language changes
+    session.settings.onValueChange('transcribe_language', (newValue, oldValue) => {
+      console.log(`Transcribe language changed for user ${userId}: ${oldValue} -> ${newValue}`);
+      this.applySettings(session, sessionId, userId);
+    });
+  }
+
+  /**
+   * Apply settings from the session to the transcript processor
+   */
+  private async applySettings(
+    session: TpaSession,
+    sessionId: string,
+    userId: string
+  ): Promise<void> {
+    try {
+      // Extract settings
+      const language = session.settings.get<string>('transcribe_language', 'English');
+      const locale = languageToLocale(language);
+      const previousLanguage = userActiveLanguages.get(userId) || 'none';
+      const languageChanged = previousLanguage !== 'none' && previousLanguage !== language;
+      
+      // Store the current language
+      userActiveLanguages.set(userId, language);
+
+      // Process line width
+      const isChineseLanguage = language === 'Chinese (Hanzi)';
+      let lineWidth: number;
+      
+      if (isChineseLanguage) {
+        lineWidth = session.settings.get<number>('line_width', 10);
+      } else {
+        lineWidth = session.settings.get<number>('line_width', 30);
+      }
+      
+      lineWidth = convertLineWidth(lineWidth.toString(), isChineseLanguage);
+
+      // Process number of lines
+      let numberOfLines = session.settings.get<number>('number_of_lines', 3);
+      if (isNaN(numberOfLines) || numberOfLines < 1) numberOfLines = 3;
+
+      console.log(`Applied settings for user ${userId}: language=${locale}, lineWidth=${lineWidth}, numberOfLines=${numberOfLines}, isChineseLanguage=${isChineseLanguage}`);
+
+      // Get previous processor to check for language changes and preserve history
+      const previousTranscriptProcessor = userTranscriptProcessors.get(userId);
+      
+      // Create new processor with the settings
+      const newProcessor = new TranscriptProcessor(lineWidth, numberOfLines, MAX_FINAL_TRANSCRIPTS, isChineseLanguage);
+
+      // Preserve transcript history if language didn't change and we have a previous processor
+      if (!languageChanged && previousTranscriptProcessor) {
+        const previousHistory = previousTranscriptProcessor.getFinalTranscriptHistory();
+        for (const transcript of previousHistory) {
+          newProcessor.processString(transcript, true);
+        }
+        console.log(`Preserved ${previousHistory.length} transcripts after settings change`);
+      } else if (languageChanged) {
+        console.log(`Cleared transcript history due to language change`);
+      }
+
+      // Update the processor
+      userTranscriptProcessors.set(userId, newProcessor);
+
+      // Show the updated transcript layout immediately with the new formatting
+      const formattedTranscript = newProcessor.processString("", true);
+      this.showTranscriptsToUser(session, formattedTranscript, true);
+
+      // Set up transcription handler for the selected language
+      console.log(`Setting up transcription handlers for session ${sessionId} with language ${locale}`);
+      
+      // Subscribe to language-specific transcription
+      const languageHandler = (data: TranscriptionData) => {
+        this.handleTranscription(session, sessionId, userId, data);
+      };
+      
+      const cleanup = session.onTranscriptionForLanguage(locale, languageHandler);
+      
+      // Register cleanup handler
+      this.addCleanupHandler(cleanup);
+      
+      console.log(`Subscribed to transcriptions in ${locale} for user ${userId}`);
+      
+    } catch (error) {
+      console.error(`Error applying settings for user ${userId}:`, error);
+      throw error;
     }
   }
 
@@ -108,155 +217,6 @@ class LiveCaptionsApp extends TpaServer {
     const activeSession = this.activeUserSessions.get(userId);
     if (activeSession && activeSession.sessionId === sessionId) {
       this.activeUserSessions.delete(userId);
-    }
-  }
-
-  /**
-   * Processes user settings - either fetches them from API or uses provided settings
-   * Can be used for both initial session setup and settings updates
-   */
-  public async processSettings(
-    userId: string,
-    session?: TpaSession, 
-    sessionId?: string, 
-    providedSettings?: any[]
-  ): Promise<any> {
-    try {
-      // If no session provided, try to find an active one
-      if (!session || !sessionId) {
-        console.log(`No session provided for user ${userId}, looking for active session`);
-        const activeSession = this.getActiveSessionForUser(userId);
-        
-        if (activeSession) {
-          console.log(`Found active session ${activeSession.sessionId} for user ${userId}, using it`);
-          return this.processSettings(userId, activeSession.session, activeSession.sessionId, providedSettings);
-        } else {
-          console.log(`No active session found for user ${userId}, cannot process settings`);
-          return {
-            status: 'Failed to process settings',
-            error: 'No active session available',
-            userId
-          };
-        }
-      }
-      
-      let settings: any[] = providedSettings || [];
-      
-      // If settings aren't provided, fetch them from API
-      if (!providedSettings) {
-        console.log(`Fetching settings for user ${userId}`);
-        const response = await axios.get(`http://${CLOUD_HOST_NAME}/tpasettings/user/${PACKAGE_NAME}`, {
-          headers: { Authorization: `Bearer ${userId}` }
-        });
-        settings = response.data.settings;
-        console.log(`Fetched settings for user ${userId}:`, settings);
-      } else {
-        console.log('Using provided settings for user:', userId);
-      }
-      
-      // Extract settings
-      const lineWidthSetting = settings.find(s => s.key === 'line_width');
-      const numberOfLinesSetting = settings.find(s => s.key === 'number_of_lines');
-      const transcribeLanguageSetting = settings.find(s => s.key === 'transcribe_language');
-
-      // Process language setting - handle both direct updating and initial fetch cases
-      let language: string;
-      let locale: string;
-      
-      if (providedSettings) {
-        // For updateSettings path
-        language = transcribeLanguageSetting?.value || 'English';
-        locale = languageToLocale(language);
-      } else {
-        // For fetchAndApplySettings path
-        language = transcribeLanguageSetting?.value || 'English';
-        locale = languageToLocale(language);
-      }
-
-      // Get previous processor to check for language changes and preserve history
-      const previousTranscriptProcessor = userTranscriptProcessors.get(userId);
-      const previousLanguage = userActiveLanguages.get(userId) || 'none';
-      
-      const languageChanged = previousLanguage !== 'none' && previousLanguage !== language;
-      
-      // Store the current language
-      userActiveLanguages.set(userId, language);
-
-      // console.log(`User ${userId} has language ${language}`);
-
-      // Process line width
-      let lineWidth = 30; // default
-
-      const isChineseLanguage = language === 'Chinese (Hanzi)';
-      
-      // console.log(`User ${userId} has isChineseLanguage ${isChineseLanguage}`);
-
-      if (lineWidthSetting) {
-        lineWidth = convertLineWidth(lineWidthSetting.value, isChineseLanguage);
-      } else if (isChineseLanguage) {
-        lineWidth = 10; // Special default for Chinese/Japanese
-      }
-
-      // Process number of lines
-      let numberOfLines = 3; // default
-      if (numberOfLinesSetting) {
-        numberOfLines = Number(numberOfLinesSetting.value);
-        if (isNaN(numberOfLines) || numberOfLines < 1) numberOfLines = 3;
-      }
-
-      console.log(`Applied settings for user ${userId}: language=${locale}, lineWidth=${lineWidth}, numberOfLines=${numberOfLines}, isChineseLanguage=${isChineseLanguage}`);
-
-      // Create new processor with the settings
-      const newProcessor = new TranscriptProcessor(lineWidth, numberOfLines, MAX_FINAL_TRANSCRIPTS, isChineseLanguage);
-
-      // Preserve transcript history if language didn't change and we have a previous processor
-      if (!languageChanged && previousTranscriptProcessor) {
-        const previousHistory = previousTranscriptProcessor.getFinalTranscriptHistory();
-        for (const transcript of previousHistory) {
-          newProcessor.processString(transcript, true);
-        }
-        console.log(`Preserved ${previousHistory.length} transcripts after settings change`);
-      } else if (languageChanged) {
-        console.log(`Cleared transcript history due to language change`);
-      }
-
-      // Update the processor
-      userTranscriptProcessors.set(userId, newProcessor);
-
-      // Show the updated transcript layout immediately with the new formatting
-      if (session) {
-        const formattedTranscript = newProcessor.processString("", true);
-        this.showTranscriptsToUser(session, formattedTranscript, true);
-      }
-
-      // If we're in session context, set up transcription handler
-      console.log(`Setting up transcription handlers for session ${sessionId}`);
-      
-      // Clean up previous handler if it exists
-      // This would need to be implemented if we want to support language switching in a session
-      
-      const languageHandler = (data: TranscriptionData) => {
-        this.handleTranscription(session, sessionId, userId, data);
-      };
-
-      // Subscribe to language-specific transcription
-      const cleanup = session.onTranscriptionForLanguage(locale, languageHandler);
-      
-      // Register cleanup handler
-      this.addCleanupHandler(cleanup);
-      
-      console.log(`Subscribed to transcriptions in ${locale} for user ${userId}`);
-
-      // Return status for API endpoint response
-      return {
-        status: 'Settings processed successfully',
-        languageChanged: languageChanged,
-        transcriptsPreserved: !languageChanged,
-        sessionUpdated: true
-      };
-    } catch (error) {
-      console.error(`Error processing settings for user ${userId}:`, error);
-      throw error;
     }
   }
 
@@ -383,25 +343,6 @@ class LiveCaptionsApp extends TpaServer {
 // Create and start the app
 const liveCaptionsApp = new LiveCaptionsApp();
 
-// Add settings endpoint
-const expressApp = liveCaptionsApp.getExpressApp();
-expressApp.post('/settings', async (req: any, res: any) => {
-  try {
-    const { userIdForSettings, settings } = req.body;
-
-    if (!userIdForSettings || !Array.isArray(settings)) {
-      return res.status(400).json({ error: 'Missing userId or settings array in payload' });
-    }
-
-    // Process settings - the method will find active session if available
-    const result = await liveCaptionsApp.processSettings(userIdForSettings, undefined, undefined, settings);
-    
-    res.json(result);
-  } catch (error) {
-    console.error('Error in settings endpoint:', error);
-    res.status(500).json({ error: 'Internal server error updating settings' });
-  }
-});
 
 // Start the server
 liveCaptionsApp.start().then(() => {
