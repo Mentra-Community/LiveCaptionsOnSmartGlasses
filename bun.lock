@@ -4,7 +4,7 @@
     "": {
       "name": "@augmentos/livecaptions",
       "dependencies": {
-        "@augmentos/sdk": "^1.1.3",
+        "@augmentos/sdk": "1.1.3",
         "@node-rs/jieba": "^2.0.1",
         "@types/express": "^5.0.1",
         "@types/node": "^22.13.14",
@@ -20,7 +20,7 @@
     },
   },
   "packages": {
-    "@augmentos/sdk": ["@augmentos/sdk@1.1.4", "", { "dependencies": { "axios": "^1.8.1", "express": "^4.18.2", "jsonwebtoken": "^8.5.1" } }, "sha512-YCuBmHebFftnvv53inkTlIMwv07VsYx92a6KsAJxGpqhTeMg9IGk5ii1pxALcH38nwiY5cGOk9fopYVKs5XMNw=="],
+    "@augmentos/sdk": ["@augmentos/sdk@1.1.3", "", { "dependencies": { "axios": "^1.8.1", "express": "^4.18.2", "jsonwebtoken": "^8.5.1" } }, "sha512-6P5pIscSP19X4dopyqfVbJAdnKjm/nzCH9oHzQyfnfbLR0EaCZ2jAFBpMFhj7dBrjDDBYCK+/Xyz0ZNPgwXViA=="],
 
     "@emnapi/core": ["@emnapi/core@1.4.0", "", { "dependencies": { "@emnapi/wasi-threads": "1.0.1", "tslib": "^2.4.0" } }, "sha512-H+N/FqT07NmLmt6OFFtDfwe8PNygprzBikrEMyQfgqSmT0vzE515Pz7R8izwB9q/zsH/MA64AKoul3sA6/CzVg=="],
 

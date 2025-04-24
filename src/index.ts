@@ -237,6 +237,10 @@ class LiveCaptionsApp extends TpaServer {
     }
 
     const isFinal = transcriptionData.isFinal;
+    if (isFinal) {
+      console.log(`[Session ${sessionId}]: Received final transcription`);
+      return;
+    }
     let newTranscript = transcriptionData.text;
     const language = transcriptionData.language;
 
