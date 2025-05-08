@@ -190,6 +190,7 @@ export function languageToLocale(localeString: string): string {
         case "Japanese":
         case "Japanese (Japan)":
             return "ja-JP";
+        case "Javanese":
         case "Javanese (Latin, Indonesia)":
             return "jv-ID";
         case "Georgian (Georgia)":
