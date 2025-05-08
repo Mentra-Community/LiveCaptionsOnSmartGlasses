@@ -52,7 +52,17 @@
         { "label": "Czech", "value": "Czech" },
         { "label": "Swedish", "value": "Swedish" },
         { "label": "Finnish", "value": "Finnish" },
-        { "label": "Hebrew", "value": "Hebrew" }
+        { "label": "Hebrew", "value": "Hebrew" },
+        { "label": "Tagalog", "value": "Tagalog" },
+        { "label": "Javanese", "value": "Javanese" },
+        { "label": "Punjabi", "value": "Punjabi" },
+        { "label": "Bhojpuri", "value": "Bhojpuri" },
+        { "label": "Yoruba", "value": "Yoruba" },
+        { "label": "Igbo", "value": "Igbo" },
+        { "label": "Malay", "value": "Malay" },
+        { "label": "Croatian", "value": "Croatian" },
+        { "label": "Serbian", "value": "Serbian" },
+        { "label": "Uzbek", "value": "Uzbek" }
       ]
     },
     {

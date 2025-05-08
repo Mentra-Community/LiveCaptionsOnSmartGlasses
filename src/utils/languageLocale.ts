@@ -171,7 +171,7 @@ export function languageToLocale(localeString: string): string {
             return "he-IL";
         case "Hindi (India)":
             return "hi-IN";
-        case "Croatian (Croatia)":
+        case "Croatian":
             return "hr-HR";
         case "Hungarian (Hungary)":
             return "hu-HU";
@@ -232,7 +232,7 @@ export function languageToLocale(localeString: string): string {
             return "nl-BE";
         case "Dutch (Netherlands)":
             return "nl-NL";
-        case "Punjabi (India)":
+        case "Punjabi":
             return "pa-IN";
         case "Polish (Poland)":
             return "pl-PL";
@@ -258,7 +258,7 @@ export function languageToLocale(localeString: string): string {
             return "so-SO";
         case "Albanian (Albania)":
             return "sq-AL";
-        case "Serbian (Cyrillic, Serbia)":
+        case "Serbian":
             return "sr-RS";
         case "Swedish (Sweden)":
             return "sv-SE";
@@ -382,6 +382,18 @@ export function languageToLocale(localeString: string): string {
             return "fi-FI";
         case "Hebrew":
             return "he-IL";
+        case "Tagalog":
+            return "fil-PH";
+        case "Yoruba":
+            return "yo-NG";
+        case "Igbo":
+            return "ig-NG";
+        case "Bhojpuri":
+            return "hi-IN";
+        case "Malay":
+            return "ms-MY";
+        case "Uzbek":
+            return "uz-UZ";
         default:
             return "en-US";
     }
