@@ -92,7 +92,6 @@ export function languageToLocale(localeString: string): string {
         case "English (Tanzania)":
             return "en-TZ";
         case "English":
-        case "English (United States)":
             return "en-US";
         case "English (South Africa)":
             return "en-ZA";
@@ -303,6 +302,86 @@ export function languageToLocale(localeString: string): string {
             return "zh-TW";
         case "Zulu (South Africa)":
             return "zu-ZA";
+        case "English":
+            return "en-US";
+        case "Chinese (Hanzi)":
+            return "zh-CN";
+        case "Chinese (Pinyin)":
+            return "zh-CN";
+        case "Spanish":
+            return "es-ES";
+        case "Hindi":
+            return "hi-IN";
+        case "French":
+            return "fr-FR";
+        case "Standard Arabic":
+            return "ar-EG";
+        case "Bengali":
+            return "bn-IN";
+        case "Russian":
+            return "ru-RU";
+        case "Portuguese":
+            return "pt-BR";
+        case "Urdu":
+            return "ur-IN";
+        case "Indonesian":
+            return "id-ID";
+        case "German":
+            return "de-DE";
+        case "Japanese":
+            return "ja-JP";
+        case "Swahili":
+            return "sw-KE";
+        case "Marathi":
+            return "mr-IN";
+        case "Telugu":
+            return "te-IN";
+        case "Turkish":
+            return "tr-TR";
+        case "Tamil":
+            return "ta-IN";
+        case "Vietnamese":
+            return "vi-VN";
+        case "Korean":
+            return "ko-KR";
+        case "Italian":
+            return "it-IT";
+        case "Hausa":
+            return "ha-NG";
+        case "Thai":
+            return "th-TH";
+        case "Persian":
+            return "fa-IR";
+        case "Polish":
+            return "pl-PL";
+        case "Ukrainian":
+            return "uk-UA";
+        case "Malayalam":
+            return "ml-IN";
+        case "Gujarati":
+            return "gu-IN";
+        case "Kannada":
+            return "kn-IN";
+        case "Odia":
+            return "or-IN";
+        case "Burmese":
+            return "my-MM";
+        case "Romanian":
+            return "ro-RO";
+        case "Dutch":
+            return "nl-NL";
+        case "Greek":
+            return "el-GR";
+        case "Hungarian":
+            return "hu-HU";
+        case "Czech":
+            return "cs-CZ";
+        case "Swedish":
+            return "sv-SE";
+        case "Finnish":
+            return "fi-FI";
+        case "Hebrew":
+            return "he-IL";
         default:
             return "en-US";
     }
