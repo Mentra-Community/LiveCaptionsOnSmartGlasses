@@ -4,7 +4,7 @@
     "": {
       "name": "@augmentos/livecaptions",
       "dependencies": {
-        "@augmentos/sdk": "^1.1.3",
+        "@augmentos/sdk": "1.1.4",
         "@node-rs/jieba": "^2.0.1",
         "@types/express": "^5.0.1",
         "@types/node": "^22.13.14",

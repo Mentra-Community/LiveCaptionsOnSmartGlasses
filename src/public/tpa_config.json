@@ -18,10 +18,6 @@
           "value": "English"
         },
         {
-          "label": "Russian",
-          "value": "Russian"
-        },
-        {
           "label": "Chinese (Hanzi)",
           "value": "Chinese (Hanzi)"
         },
@@ -30,24 +26,20 @@
           "value": "Chinese (Pinyin)"
         },
         {
-          "label": "Spanish",
-          "value": "Spanish"
+          "label": "French",
+          "value": "French"
+        },
+        {
+          "label": "Russian",
+          "value": "Russian"
+        },
+        {
+          "label": "Portuguese",
+          "value": "Portuguese"
         },
         {
           "label": "Japanese",
           "value": "Japanese"
-        },
-        {
-          "label": "Dutch",
-          "value": "Dutch"
-        },
-        {
-          "label": "Finnish",
-          "value": "Finnish"
-        },
-        {
-          "label": "French",
-          "value": "French"
         },
         {
           "label": "German",
@@ -66,8 +58,12 @@
           "value": "Turkish"
         },
         {
-          "label": "Portuguese",
-          "value": "Portuguese"
+          "label": "Dutch",
+          "value": "Dutch"
+        },
+        {
+          "label": "Finnish",
+          "value": "Finnish"
         }
       ]
     },
