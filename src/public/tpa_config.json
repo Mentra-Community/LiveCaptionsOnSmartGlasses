@@ -9,7 +9,7 @@
     },
     {
       "key": "transcribe_language",
-      "type": "select",
+      "type": "select_with_search",
       "label": "Transcribe language",
       "defaultValue": "English",
       "options": [
