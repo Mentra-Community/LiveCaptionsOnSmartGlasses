@@ -52,7 +52,7 @@ export function languageToLocale(localeString: string): string {
             return "ca-ES";
         case "Czech (Czechia)":
             return "cs-CZ";
-        case "Welsh (United Kingdom)":
+        case "Welsh":
             return "cy-GB";
         case "Danish (Denmark)":
             return "da-DK";
