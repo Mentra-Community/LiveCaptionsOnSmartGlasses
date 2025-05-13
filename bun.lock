@@ -4,7 +4,7 @@
     "": {
       "name": "@augmentos/livecaptions",
       "dependencies": {
-        "@augmentos/sdk": "1.1.4",
+        "@augmentos/sdk": "1.1.7",
         "@node-rs/jieba": "^2.0.1",
         "@types/express": "^5.0.1",
         "@types/node": "^22.13.14",
@@ -20,7 +20,7 @@
     },
   },
   "packages": {
-    "@augmentos/sdk": ["@augmentos/sdk@1.1.4", "", { "dependencies": { "axios": "^1.8.1", "express": "^4.18.2", "jsonwebtoken": "^8.5.1" } }, "sha512-YCuBmHebFftnvv53inkTlIMwv07VsYx92a6KsAJxGpqhTeMg9IGk5ii1pxALcH38nwiY5cGOk9fopYVKs5XMNw=="],
+    "@augmentos/sdk": ["@augmentos/sdk@1.1.7", "", { "dependencies": { "axios": "^1.8.1", "cookie-parser": "^1.4.7", "express": "^4.18.2", "jsonwebtoken": "^8.5.1" } }, "sha512-fi4GT7YcSIqUaaljs61TmvbDxykudBme5+r7YYg3k46jul0vNJtDNSD/k8ygjW3/Dtq+aunOc6RXYedPcFoB4w=="],
 
     "@emnapi/core": ["@emnapi/core@1.4.0", "", { "dependencies": { "@emnapi/wasi-threads": "1.0.1", "tslib": "^2.4.0" } }, "sha512-H+N/FqT07NmLmt6OFFtDfwe8PNygprzBikrEMyQfgqSmT0vzE515Pz7R8izwB9q/zsH/MA64AKoul3sA6/CzVg=="],
 
@@ -111,6 +111,8 @@
     "content-type": ["content-type@1.0.5", "", {}, "sha512-nTjqfcBFEipKdXCv4YDQWCfmcLZKm81ldF0pAopTvyrFGVbcR6P/VAAd5G7N+0tTr8QqiU0tFadD6FK4NtJwOA=="],
 
     "cookie": ["cookie@0.7.1", "", {}, "sha512-6DnInpx7SJ2AK3+CTUE/ZM0vWTUboZCegxhC2xiIydHR9jNuTAASBrfEpHhiGOZw/nX51bHt6YQl8jsGo4y/0w=="],
+
+    "cookie-parser": ["cookie-parser@1.4.7", "", { "dependencies": { "cookie": "0.7.2", "cookie-signature": "1.0.6" } }, "sha512-nGUvgXnotP3BsjiLX2ypbQnWoGUPIIfHQNZkkC668ntrzGWEZVW70HDEB1qnNGMicPje6EttlIgzo51YSwNQGw=="],
 
     "cookie-signature": ["cookie-signature@1.0.6", "", {}, "sha512-QADzlaHc8icV8I7vbaJXJwod9HWYp8uCqf1xa4OfNu1T7JVxQIrUgOWtHdNDtPiywmFbiS12VjotIXLrKM3orQ=="],
 
@@ -279,6 +281,8 @@
     "vary": ["vary@1.1.2", "", {}, "sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg=="],
 
     "ws": ["ws@8.18.1", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-RKW2aJZMXeMxVpnZ6bck+RswznaxmzdULiBr6KY7XkTnW8uvt0iT9H5DkHUChXrc+uurzwa0rVI16n/Xzjdz1w=="],
+
+    "cookie-parser/cookie": ["cookie@0.7.2", "", {}, "sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w=="],
 
     "debug/ms": ["ms@2.0.0", "", {}, "sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A=="],
 
