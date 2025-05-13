@@ -268,7 +268,7 @@ export function languageToLocale(localeString: string): string {
             return "sw-TZ";
         case "Tamil (India)":
             return "ta-IN";
-        case "Telugu (India)":
+        case "Telugu":
             return "te-IN";
         case "Thai (Thailand)":
             return "th-TH";
