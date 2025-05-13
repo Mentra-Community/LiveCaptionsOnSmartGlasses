@@ -7,6 +7,7 @@ export function languageToLocale(localeString: string): string {
         case "Amharic (Ethiopia)":
             return "am-ET";
         case "Arabic":
+        case "Standard Arabic":
         case "Arabic (United Arab Emirates)":
             return "ar-AE";
         case "Arabic (Bahrain)":
