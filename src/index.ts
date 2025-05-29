@@ -62,7 +62,7 @@ class LiveCaptionsApp extends TpaServer {
    */
   protected async onSession(session: TpaSession, sessionId: string, userId: string): Promise<void> {
     console.log(`\n\n🗣️🗣️🗣️Received new session for user ${userId}, session ${sessionId}\n\n`);
-
+    console.log("session.settings for user", session.settings);
     // Initialize transcript processor and debouncer for this session
     this.sessionDebouncers.set(sessionId, { lastSentTime: 0, timer: null });
     
@@ -129,6 +129,7 @@ class LiveCaptionsApp extends TpaServer {
   ): Promise<void> {
     try {
       // Extract settings
+      console.log("printing settings", session.settings);
       const language = session.settings.get<string>('transcribe_language', 'English');
       const locale = languageToLocale(language);
       const previousLanguage = userActiveLanguages.get(userId) || 'none';

@@ -9,7 +9,7 @@
     "docker:stop": "docker compose -f docker/docker-compose.dev.yml -p dev down",
     "docker:build": "docker compose -f docker/docker-compose.dev.yml -p dev build",
     "start": "bun src/index.ts",
-    "ngrok:isaiah": "ngrok http --url=isaiah-live-captions.ngrok.app 80",
+    "ngrok:isaiah": "ngrok http --url=isaiah-tpa2.ngrok.app 8080",
     "add": "docker exec -it live-captions-dev bun add",
     "add:dev": "docker exec -it live-captions-dev bun add -d",
     "remove": "docker exec -it live-captions-dev bun remove",
@@ -31,7 +31,7 @@
     "ghcr:release": "npm run ghcr:build && npm run ghcr:push"
   },
   "dependencies": {
-    "@augmentos/sdk": "1.1.7",
+    "@augmentos/sdk": "1.1.20",
     "@node-rs/jieba": "^2.0.1",
     "@types/express": "^5.0.1",
     "@types/node": "^22.13.14",
