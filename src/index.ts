@@ -1,11 +1,11 @@
 import path from 'path';
 import {
-  TpaServer,
-  TpaSession,
+  AppServer,
+  AppSession,
   StreamType,
   ViewType,
   TranscriptionData,
-} from '@augmentos/sdk';
+} from '@mentra/sdk';
 import { TranscriptProcessor, languageToLocale, convertLineWidth } from './utils';
 import axios from 'axios';
 import { convertToPinyin } from './utils/ChineseUtils';
@@ -48,11 +48,11 @@ interface InactivityTimer {
 /**
  * LiveCaptionsApp - Main application class that extends TpaServer
  */
-class LiveCaptionsApp extends TpaServer {
+class LiveCaptionsApp extends AppServer {
   // Session debouncers for throttling non-final transcripts
   private sessionDebouncers = new Map<string, TranscriptDebouncer>();
   // Track active sessions by user ID
-  private activeUserSessions = new Map<string, { session: TpaSession, sessionId: string }>();
+  private activeUserSessions = new Map<string, { session: AppSession, sessionId: string }>();
   // Inactivity timers for clearing text after 1 minute of no activity
   private inactivityTimers = new Map<string, InactivityTimer>();
 
@@ -66,9 +66,9 @@ class LiveCaptionsApp extends TpaServer {
   }
 
   /**
-   * Called by TpaServer when a new session is created
+   * Called by AppServer when a new session is created
    */
-  protected async onSession(session: TpaSession, sessionId: string, userId: string): Promise<void> {
+  protected async onSession(session: AppSession, sessionId: string, userId: string): Promise<void> {
     console.log(`\n\n🗣️🗣️🗣️Received new session for user ${userId}, session ${sessionId}\n\n`);
 
     // Initialize transcript processor and debouncer for this session
@@ -107,7 +107,7 @@ class LiveCaptionsApp extends TpaServer {
    * Set up handlers for settings changes
    */
   private setupSettingsHandlers(
-    session: TpaSession,
+    session: AppSession,
     sessionId: string,
     userId: string
   ): void {
@@ -134,7 +134,7 @@ class LiveCaptionsApp extends TpaServer {
    * Apply settings from the session to the transcript processor
    */
   private async applySettings(
-    session: TpaSession,
+    session: AppSession,
     sessionId: string,
     userId: string
   ): Promise<void> {
@@ -214,7 +214,7 @@ class LiveCaptionsApp extends TpaServer {
   /**
    * Resets the inactivity timer for a session and schedules text clearing
    */
-  private resetInactivityTimer(session: TpaSession, sessionId: string, userId: string): void {
+  private resetInactivityTimer(session: AppSession, sessionId: string, userId: string): void {
     const inactivityTimer = this.inactivityTimers.get(sessionId);
     if (!inactivityTimer) return;
 
@@ -248,7 +248,7 @@ class LiveCaptionsApp extends TpaServer {
   }
 
   /**
-   * Called by TpaServer when a session is stopped
+   * Called by AppServer when a session is stopped
    */
   protected async onStop(sessionId: string, userId: string, reason: string): Promise<void> {
     console.log(`Session ${sessionId} stopped: ${reason}`);
@@ -284,7 +284,7 @@ class LiveCaptionsApp extends TpaServer {
    * Handles transcription data from the AugmentOS cloud
    */
   private handleTranscription(
-    session: TpaSession, 
+    session: AppSession, 
     sessionId: string, 
     userId: string, 
     transcriptionData: any
@@ -331,7 +331,7 @@ class LiveCaptionsApp extends TpaServer {
    * Debounces transcript display to avoid too frequent updates for non-final transcripts
    */
   private debounceAndShowTranscript(
-    session: TpaSession,
+    session: AppSession,
     sessionId: string,
     transcript: string,
     isFinal: boolean
@@ -377,7 +377,7 @@ class LiveCaptionsApp extends TpaServer {
    * Displays transcript text in the AR view
    */
   private showTranscriptsToUser(
-    session: TpaSession,
+    session: AppSession,
     transcript: string,
     isFinal: boolean
   ): void {
@@ -404,7 +404,7 @@ class LiveCaptionsApp extends TpaServer {
   /**
    * Helper method to get active session for a user
    */
-  public getActiveSessionForUser(userId: string): { session: TpaSession, sessionId: string } | null {
+  public getActiveSessionForUser(userId: string): { session: AppSession, sessionId: string } | null {
     return this.activeUserSessions.get(userId) || null;
   }
 }
