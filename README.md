@@ -1,19 +1,25 @@
-# Live Captions App for AugmentOS
+<p align="center">
+  <img src="https://appstore.augmentos.org/app-icons/captions.png" alt="Captions Icon" width="240"/><br/>
+  <strong style="font-size: 1.8em;">Live Captions for MentraOS</strong><br/>
+  Real-time subtitles, right in your smart glasses.<br/>
+  Bring conversations, meetings, and media to life with seamless live captioning on MentraOS
+  <a href="https://apps.mentra.glass/package/com.augmentos.livecaptions"><br/><br/>
+    <img src="https://img.shields.io/badge/Download-App%20Store-blue?style=for-the-badge" alt="Download"/>
+  </a>
+</p>
+ 
 
-This app provides live captions functionality for AugmentOS smart glasses.
+---
 
-## Development
+## 🚀 Development Guide
 
 ### Prerequisites
+- [Docker](https://www.docker.com/products/docker-desktop)  
+- [Bun](https://bun.sh/) *(optional, for local dev)*  
 
-- [Docker](https://www.docker.com/products/docker-desktop)
-- [Bun](https://bun.sh/) (optional for local development)
+---
 
-### Setup and Development
-
-#### Docker Development (Recommended)
-
-The quickest way to get started is using Docker:
+### 🐳 Docker Development (Recommended)
 
 ```bash
 # Start the development environment
@@ -32,17 +38,16 @@ bun run docker:stop
 bun run docker:build
 ```
 
-##### Using Local SDK (Optional)
+#### 🔗 Using Local SDK (Optional)  
+If you’re hacking on both the app and SDK, the dev environment will auto-detect and use a local SDK from:  
+- `../../../AugmentOS/augmentos_cloud/packages/sdk`  
+- `../../AugmentOS/augmentos_cloud/packages/sdk`  
+- `../../../augmentos_cloud/packages/sdk`  
+- `../../augmentos_cloud/packages/sdk`  
 
-If you're working on both the app and SDK simultaneously, the development environment will automatically detect and use a local SDK if it's available in one of these paths:
-- ../../../AugmentOS/augmentos_cloud/packages/sdk
-- ../../AugmentOS/augmentos_cloud/packages/sdk
-- ../../../augmentos_cloud/packages/sdk
-- ../../augmentos_cloud/packages/sdk
+---
 
-#### Local Development (Without Docker)
-
-If you prefer to develop without Docker:
+### 💻 Local Development (Without Docker)
 
 ```bash
 # Install dependencies
@@ -52,7 +57,9 @@ bun install
 bun run dev
 ```
 
-### Common Tasks
+---
+
+### 🛠 Common Tasks
 
 ```bash
 # Add a new package
@@ -74,6 +81,7 @@ bun run lint
 bun run sh
 ```
 
-## License
+---
 
-See the [LICENSE](LICENSE) file for details.
+## 📜 License
+See the [LICENSE](LICENSE) file for details.  
