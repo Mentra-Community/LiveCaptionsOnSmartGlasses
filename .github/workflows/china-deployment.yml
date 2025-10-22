@@ -1,0 +1,76 @@
+name: China Cloud Deployment
+
+on:
+  push:
+    branches: [china]
+
+jobs:
+  china-cloud-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      ACR_INSTANCE_ID: cri-h675v46p9lj694l6
+      ACR_REGION_ID: cn-shenzhen
+      ACR_PUBLIC_DOMAIN: mentra-acr-cnsz-a-registry.cn-shenzhen.cr.aliyuncs.com
+
+    steps:
+      # 1. Checkout source code
+      - uses: actions/checkout@v4
+
+      # 2. Short commit SHA for tagging
+      - id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      # 3. Compute Docker tags dynamically
+      - id: docker-tags
+        run: |
+          BRANCH=${GITHUB_REF_NAME//\//-}
+          echo "tags=$BRANCH latest" >> "$GITHUB_OUTPUT"
+
+      # 4. Docker Buildx
+      - uses: docker/setup-buildx-action@v2
+
+      # 5. Install Alibaba Cloud CLI
+      - name: Install Alibaba Cloud CLI
+        run: |
+          curl -sSL https://aliyuncli.alicdn.com/aliyun-cli-linux-latest-amd64.tgz | tar -xz
+          sudo mv aliyun /usr/local/bin/
+
+      # 6. Configure Alibaba CLI with long-lived AK/SK
+      - name: Configure Alibaba Cloud CLI
+        run: |
+          aliyun configure set \
+            --profile default \
+            --mode AK \
+            --region $ACR_REGION_ID \
+            --access-key-id ${{ secrets.ALIBABA_ACCESS_KEY_ID }} \
+            --access-key-secret ${{ secrets.ALIBABA_ACCESS_KEY_SECRET }}
+        shell: bash
+
+      # 7. Get temporary Docker login token
+      - id: acr-token
+        run: |
+          TOKEN=$(aliyun cr GetAuthorizationToken \
+            --InstanceId $ACR_INSTANCE_ID \
+            --RegionId $ACR_REGION_ID \
+            | jq -r '.AuthorizationToken')
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      # 8. Docker login with temporary token
+      - name: Docker Login to ACR
+        run: |
+          docker login \
+            --username cr_temp_user \
+            --password ${{ steps.acr-token.outputs.token }} \
+            $ACR_PUBLIC_DOMAIN
+
+      # 9. Build & push Docker image
+      - uses: docker/build-push-action@v4
+        with:
+          context: ./docker
+          file: ./docker/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ACR_PUBLIC_DOMAIN }}/mentra-dev/live_captions:${{ steps.vars.outputs.sha_short }}
+            ${{ env.ACR_PUBLIC_DOMAIN }}/mentra-dev/live_captions:latest
