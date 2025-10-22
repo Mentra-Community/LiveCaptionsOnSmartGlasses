@@ -16,6 +16,7 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT) : 80;
 const PACKAGE_NAME = process.env.PACKAGE_NAME;
 const AUGMENTOS_API_KEY = process.env.AUGMENTOS_API_KEY; // In production, this would be securely stored
 const MAX_FINAL_TRANSCRIPTS = 30;
+const IS_CHINA = process.env.DEPLOYMENT_REGION === 'china';
 
 // Verify env vars are set.
 if (!AUGMENTOS_API_KEY) {
@@ -57,11 +58,12 @@ class LiveCaptionsApp extends AppServer {
   private inactivityTimers = new Map<string, InactivityTimer>();
 
   constructor() {
+    const publicDir = IS_CHINA ? path.join(__dirname, './china_public') : path.join(__dirname, './public');
     super({
       packageName: PACKAGE_NAME!,
       apiKey: AUGMENTOS_API_KEY!,
       port: PORT,
-      publicDir: path.join(__dirname, './public'),
+      publicDir,
     });
   }
 
