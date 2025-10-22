@@ -68,7 +68,7 @@ jobs:
       # 9. Build & push Docker image
       - uses: docker/build-push-action@v4
         with:
-          context: ./docker
+          context: .
           file: ./docker/Dockerfile
           push: true
           tags: |
