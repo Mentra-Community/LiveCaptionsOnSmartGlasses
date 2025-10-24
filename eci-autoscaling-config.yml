@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    k8s.aliyun.com/ess-scaling-group-max-size: '2'
+    k8s.aliyun.com/ess-scaling-group-name: mentra-dev-ecisg-livecaption
+    k8s.aliyun.com/ess-scaling-group-min-size: '1'
+  name: mentra-dev-ecig-livecaption-cnsz
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mentra-dev-ecig-livecaption-cnsz
+  template:
+    metadata:
+      annotations:
+        k8s.aliyun.com/eci-vswitch: vsw-wz951dlbxvoeeakcrmjr2
+        k8s.aliyun.com/eci-spot-strategy: NoSpot
+        k8s.aliyun.com/eci-security-group: sg-wz98079z7qd7oz2xtmt3
+        k8s.aliyun.com/eci-use-specs: 1.0-2.0Gi
+    spec:
+      containers:
+        - args:
+            - bun
+            - run
+            - start
+          env:
+            - name: PACKAGE_NAME
+              value: com.augmentos.livecaption
+            - name: DEPLOYMENT_REGION
+              value: china
+            - name: AUGMENTOS_API_KEY
+              value: "${AUGMENTOS_API_KEY}"
+          image: mentra-acr-cnsz-a-registry-vpc.cn-shenzhen.cr.aliyuncs.com/mentra-dev/live_captions:latest
+          imagePullPolicy: Always
+          lifecycle: {}
+          livenessProbe: {}
+          name: mentra-dev-eci-livecaption-cnsz
+          readinessProbe: {}
+          resources:
+            limits:
+              cpu: 0m
+              memory: 0m
+      restartPolicy: Always
