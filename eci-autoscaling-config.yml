@@ -26,7 +26,7 @@ spec:
             - start
           env:
             - name: PACKAGE_NAME
-              value: com.augmentos.livecaption
+              value: com.augmentos.livecaptions
             - name: DEPLOYMENT_REGION
               value: china
             - name: AUGMENTOS_API_KEY
