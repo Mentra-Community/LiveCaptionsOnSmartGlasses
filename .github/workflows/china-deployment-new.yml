@@ -30,6 +30,14 @@ jobs:
             value: "${{ secrets.AUGMENTOS_API_KEY }}"
           EOL
 
+      - name: Create container args file
+        run: |
+          cat > container-start-args.yaml << 'EOL'
+          - bun
+          - run
+          - start
+          EOL
+
       # Deploy using the environment file
       - uses: Mentra-Community/cloud-actions/deploy-app-alibaba@main
         with:
@@ -50,7 +58,4 @@ jobs:
           vswitch: "vsw-wz94gyb5cinmsod89a4tj,vsw-wz9p9qoldncmf9k5se950"
           security-group: "sg-wz95j71022jl4tezfozp"
           env-yaml-file: "env.yaml"
-          container-start-args: |
-            - bun
-            - run
-            - start
+          container-start-args-file: "container-start-args.yaml"
