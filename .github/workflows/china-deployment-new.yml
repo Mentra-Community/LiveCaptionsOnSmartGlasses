@@ -50,4 +50,7 @@ jobs:
           vswitch: "vsw-wz94gyb5cinmsod89a4tj,vsw-wz9p9qoldncmf9k5se950"
           security-group: "sg-wz95j71022jl4tezfozp"
           env-yaml-file: "env.yaml"
-          container-start-args: '["bun", "run", "start"]'
+          container-start-args: |
+            - bun
+            - run
+            - start
