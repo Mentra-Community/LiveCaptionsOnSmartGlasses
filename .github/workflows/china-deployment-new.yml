@@ -1,0 +1,52 @@
+name: China Cloud Deployment New
+
+on:
+  push:
+    branches: [china]
+
+jobs:
+  china-cloud-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      # 1. Checkout source code
+      - uses: actions/checkout@v4
+
+      # 2. Short commit SHA for tagging
+      - id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      # Create environment file with proper escaping
+      - name: Create environment file
+        run: |
+          cat > env.yaml << 'EOL'
+          - name: PACKAGE_NAME
+            value: "com.augmentos.livecaptions"
+          - name: DEPLOYMENT_REGION
+            value: "china"
+          - name: AUGMENTOS_API_KEY
+            value: "${{ secrets.AUGMENTOS_API_KEY }}"
+          EOL
+
+      # Deploy using the environment file
+      - uses: Mentra-Community/cloud-actions/deploy-app-alibaba@main
+        with:
+          environment: "dev"
+          alibaba-access-key-id: ${{ secrets.ALIBABA_ACCESS_KEY_ID }}
+          alibaba-access-key-secret: ${{ secrets.ALIBABA_ACCESS_KEY_SECRET }}
+          deployment-region: "cn-shenzhen"
+          app-name: "livecaption"
+          acr-instance-id: "cri-h675v46p9lj694l6"
+          acr-vpc-domain: "mentra-acr-cnsz-a-registry-vpc.cn-shenzhen.cr.aliyuncs.com"
+          acr-public-domain: "mentra-acr-cnsz-a-registry.cn-shenzhen.cr.aliyuncs.com"
+          docker-context: "./"
+          dockerfile: "./docker/Dockerfile"
+          image-tag: ${{ steps.vars.outputs.sha_short }}
+          min-instances: 1
+          max-instances: 2
+          use-specs: "2.0-4.0Gi"
+          vswitch: "vsw-wz94gyb5cinmsod89a4tj,vsw-wz9p9qoldncmf9k5se950"
+          security-group: "sg-wz95j71022jl4tezfozp"
+          env-yaml-file: "env.yaml"
