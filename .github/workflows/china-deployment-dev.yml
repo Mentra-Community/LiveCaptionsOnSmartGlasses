@@ -1,4 +1,4 @@
-name: China Cloud Deployment New
+name: China Cloud Deployment (dev)
 
 on:
   push:
