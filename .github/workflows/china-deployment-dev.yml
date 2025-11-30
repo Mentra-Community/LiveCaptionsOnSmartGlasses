@@ -27,7 +27,7 @@ jobs:
           - name: DEPLOYMENT_REGION
             value: "china"
           - name: AUGMENTOS_API_KEY
-            value: "${{ secrets.AUGMENTOS_API_KEY }}"
+            value: "${{ secrets.CHINA_AUGMENTOS_API_KEY }}"
           EOL
 
       - name: Create container args file
