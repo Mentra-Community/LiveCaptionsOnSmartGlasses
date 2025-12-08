@@ -1,421 +1,308 @@
-import path from 'path';
-import {
-  AppServer,
-  AppSession,
-  StreamType,
-  ViewType,
-  TranscriptionData,
-} from '@mentra/sdk';
-import { TranscriptProcessor, languageToLocale, convertLineWidth } from './utils';
-import axios from 'axios';
-import { convertToPinyin } from './utils/ChineseUtils';
-
-// Configuration constants
-const PORT = process.env.PORT ? parseInt(process.env.PORT) : 80;
-// const CLOUD_HOST_NAME = process.env.CLOUD_HOST_NAME;
-const PACKAGE_NAME = process.env.PACKAGE_NAME;
-const AUGMENTOS_API_KEY = process.env.AUGMENTOS_API_KEY; // In production, this would be securely stored
-const MAX_FINAL_TRANSCRIPTS = 30;
-
-// Verify env vars are set.
-if (!AUGMENTOS_API_KEY) {
-  throw new Error('AUGMENTOS_API_KEY environment variable is required.');
-}
-if (!PACKAGE_NAME) {
-  throw new Error('PACKAGE_NAME environment variable is required.');
-}
-// if (!CLOUD_HOST_NAME) {
-//   throw new Error('CLOUD_HOST_NAME environment variable is required.');
-// }
-
-// User transcript processors map
-const userTranscriptProcessors: Map<string, TranscriptProcessor> = new Map();
-// Map to track the active language for each user
-const userActiveLanguages: Map<string, string> = new Map();
-
-// For debouncing transcripts per session
-interface TranscriptDebouncer {
-  lastSentTime: number;
-  timer: NodeJS.Timeout | null;
-}
-
-// For managing inactivity timers per session
-interface InactivityTimer {
-  timer: NodeJS.Timeout | null;
-  lastActivityTime: number;
-}
-
 /**
- * LiveCaptionsApp - Main application class that extends TpaServer
+ * Captions App - Two Server Architecture
+ *
+ * Port 3334 (Bun)     - Serves React webview + custom API routes
+ * Port 3333 (Express) - Handles MentraOS AppServer + proxies to Bun
+ *
+ * Flow:
+ * - User visits localhost:3333 → Express proxies to Bun → Gets React app
+ * - MentraOS Cloud calls /session-start → Express handles it
+ * - Browser requests /api/hello → Express proxies to Bun
+ * - Auth headers (x-auth-user-id) are forwarded from Express to Bun
+ *
+ * API Patterns:
+ * - Express routes: Use (req as any).authUserId - authenticated by middleware
+ * - Bun routes: Use req.headers.get('x-auth-user-id') - forwarded from Express
  */
-class LiveCaptionsApp extends AppServer {
-  // Session debouncers for throttling non-final transcripts
-  private sessionDebouncers = new Map<string, TranscriptDebouncer>();
-  // Track active sessions by user ID
-  private activeUserSessions = new Map<string, { session: AppSession, sessionId: string }>();
-  // Inactivity timers for clearing text after 1 minute of no activity
-  private inactivityTimers = new Map<string, InactivityTimer>();
 
-  constructor() {
-    super({
-      packageName: PACKAGE_NAME!,
-      apiKey: AUGMENTOS_API_KEY!,
-      port: PORT,
-      publicDir: path.join(__dirname, './public'),
-    });
+import { serve } from "bun";
+import type { Request, Response } from "express";
+
+import { routes } from "./api/routes";
+import { LiveCaptionsApp } from "./app";
+import { UserSession } from "./app/session/UserSession";
+import indexDev from "./webview/index.html";
+import indexProd from "./webview/index.prod.html";
+
+// Configuration
+const PORT = parseInt(process.env.PORT || "3333", 10);
+const BUN_PORT = PORT + 1; // 3334
+const PACKAGE_NAME = process.env.PACKAGE_NAME || "com.mentra.captions";
+const API_KEY = process.env.MENTRAOS_API_KEY || "";
+
+if (!API_KEY) {
+  console.error("❌ MENTRAOS_API_KEY environment variable is not set");
+  process.exit(1);
+}
+
+if (!PACKAGE_NAME) {
+  console.error("❌ PACKAGE_NAME environment variable is not set");
+  process.exit(1);
+}
+
+console.log("🚀 Starting Captions App...\n");
+
+// ============================================
+// Step 1: Start Bun Server (Port 3334)
+// ============================================
+
+console.log(`📦 Starting Bun server on port ${BUN_PORT}...`);
+const isDevelopment = process.env.NODE_ENV === "development";
+
+const bunServer = serve({
+  development: isDevelopment && {
+    hmr: true,
+    // Add development-specific configurations here
+  },
+  port: BUN_PORT,
+  routes: {
+    // Custom API routes
+    ...routes,
+
+    // Serve pre-built webview as fallback
+    // This ensures @/ path imports are resolved at build time, not runtime
+    "/*": isDevelopment ? indexDev : indexProd,
+  },
+});
+
+console.log(`✅ Bun server running at ${bunServer.url}`);
+console.log(`   - Webview: ${bunServer.url}`);
+console.log(`   - API: ${bunServer.url}/api/hello\n`);
+
+// ============================================
+// Step 2: Start Express/AppServer (Port 3333)
+// ============================================
+
+console.log(`📱 Starting MentraOS AppServer on port ${PORT}...`);
+
+const captionsApp = new LiveCaptionsApp({
+  packageName: PACKAGE_NAME,
+  apiKey: API_KEY,
+  port: PORT,
+});
+
+// Start AppServer first (registers all MentraOS routes)
+await captionsApp.start();
+
+// Get Express app instance AFTER starting (routes are registered)
+const expressApp = captionsApp.getExpressApp();
+
+// ============================================
+// SSE Stream Route (bypasses proxy)
+// ============================================
+const SSE_HEARTBEAT_INTERVAL_MS = 15000; // Send heartbeat every 15 seconds
+
+expressApp.get("/api/transcripts/stream", (req: Request, res: Response) => {
+  console.log(`[SSE] *** HIT /api/transcripts/stream route ***`);
+
+  const authReq = req as any;
+  const userId = authReq.authUserId;
+
+  console.log(`[SSE] /api/transcripts/stream request - userId: ${userId}`);
+  console.log(
+    `[SSE] Request headers:`,
+    JSON.stringify({
+      cookie: req.headers.cookie ? "present" : "missing",
+      authorization: req.headers.authorization ? "present" : "missing",
+    }),
+  );
+
+  if (!userId) {
+    console.log("[SSE] Unauthorized - no userId");
+    return res.status(401).send("Unauthorized");
   }
 
-  /**
-   * Called by AppServer when a new session is created
-   */
-  protected async onSession(session: AppSession, sessionId: string, userId: string): Promise<void> {
-    console.log(`\n\n🗣️🗣️🗣️Received new session for user ${userId}, session ${sessionId}\n\n`);
+  const userSession = UserSession.getUserSession(userId);
+  console.log(
+    `[SSE] UserSession lookup for ${userId}: ${userSession ? "FOUND" : "NOT FOUND"}`,
+  );
+  console.log(
+    `[SSE] All UserSessions: ${Array.from(UserSession.userSessions.keys()).join(", ")}`,
+  );
 
-    // Initialize transcript processor and debouncer for this session
-    this.sessionDebouncers.set(sessionId, { lastSentTime: 0, timer: null });
-    
-    // Initialize inactivity timer for this session
-    this.inactivityTimers.set(sessionId, { timer: null, lastActivityTime: Date.now() });
-    
-    // Store the active session for this user
-    this.activeUserSessions.set(userId, { session, sessionId });
-
-    try {
-      // Set up settings change handlers
-      this.setupSettingsHandlers(session, sessionId, userId);
-      
-      // Apply initial settings
-      await this.applySettings(session, sessionId, userId);
-
-    } catch (error) {
-      console.error('Error initializing session:', error);
-      // Apply default settings if there was an error
-      const transcriptProcessor = new TranscriptProcessor(30, 3, MAX_FINAL_TRANSCRIPTS);
-      userTranscriptProcessors.set(userId, transcriptProcessor);
-      
-      // Subscribe with default language
-      const cleanup = session.onTranscriptionForLanguage('en-US', (data: TranscriptionData) => {
-        this.handleTranscription(session, sessionId, userId, data);
-      });
-      
-      // Register cleanup handler
-      this.addCleanupHandler(cleanup);
-    }
+  if (!userSession) {
+    console.log("[SSE] No active session for user");
+    return res.status(404).send("No active session");
   }
 
-  /**
-   * Set up handlers for settings changes
-   */
-  private setupSettingsHandlers(
-    session: AppSession,
-    sessionId: string,
-    userId: string
-  ): void {
-    // Handle line width changes
-    session.settings.onValueChange('line_width', (newValue, oldValue) => {
-      console.log(`Line width changed for user ${userId}: ${oldValue} -> ${newValue}`);
-      this.applySettings(session, sessionId, userId);
-    });
+  // Set SSE headers
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
 
-    // Handle number of lines changes
-    session.settings.onValueChange('number_of_lines', (newValue, oldValue) => {
-      console.log(`Number of lines changed for user ${userId}: ${oldValue} -> ${newValue}`);
-      this.applySettings(session, sessionId, userId);
-    });
+  // Send initial connection message
+  res.write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
 
-    // Handle language changes
-    session.settings.onValueChange('transcribe_language', (newValue, oldValue) => {
-      console.log(`Transcribe language changed for user ${userId}: ${oldValue} -> ${newValue}`);
-      this.applySettings(session, sessionId, userId);
-    });
-  }
+  // Track if connection is still alive
+  let isAlive = true;
 
-  /**
-   * Apply settings from the session to the transcript processor
-   */
-  private async applySettings(
-    session: AppSession,
-    sessionId: string,
-    userId: string
-  ): Promise<void> {
-    try {
-      // Extract settings
-      const language = session.settings.get<string>('transcribe_language', 'English');
-      const locale = languageToLocale(language);
-      const previousLanguage = userActiveLanguages.get(userId) || 'none';
-      const languageChanged = previousLanguage !== 'none' && previousLanguage !== language;
-      
-      // Store the current language
-      userActiveLanguages.set(userId, language);
-
-      // Process line width
-      const isChineseLanguage = language === 'Chinese (Hanzi)';
-      let lineWidth: number;
-      
-      if (isChineseLanguage) {
-        lineWidth = session.settings.get<number>('line_width', 10);
-      } else {
-        lineWidth = session.settings.get<number>('line_width', 30);
+  // Create SSE client
+  const clientId = `${userId}-${Date.now()}`;
+  const client = {
+    send: (data: any) => {
+      if (!isAlive) {
+        console.log(`[SSE] Client ${clientId} skipping send - not alive`);
+        return;
       }
-      
-      lineWidth = convertLineWidth(lineWidth.toString(), isChineseLanguage);
-
-      // Process number of lines
-      let numberOfLines = session.settings.get<number>('number_of_lines', 3);
-      if (isNaN(numberOfLines) || numberOfLines < 1) numberOfLines = 3;
-
-      console.log(`Applied settings for user ${userId}: language=${locale}, lineWidth=${lineWidth}, numberOfLines=${numberOfLines}, isChineseLanguage=${isChineseLanguage}`);
-
-      // Get previous processor to check for language changes and preserve history
-      const previousTranscriptProcessor = userTranscriptProcessors.get(userId);
-      
-      // Create new processor with the settings
-      const newProcessor = new TranscriptProcessor(lineWidth, numberOfLines, MAX_FINAL_TRANSCRIPTS, isChineseLanguage);
-
-      // Preserve transcript history if language didn't change and we have a previous processor
-      if (!languageChanged && previousTranscriptProcessor) {
-        const previousHistory = previousTranscriptProcessor.getFinalTranscriptHistory();
-        for (const transcript of previousHistory) {
-          newProcessor.processString(transcript, true);
+      try {
+        const written = res.write(`data: ${JSON.stringify(data)}\n\n`);
+        if (!written) {
+          console.log(
+            `[SSE] Client ${clientId} write returned false - buffer full or closed`,
+          );
         }
-        console.log(`Preserved ${previousHistory.length} transcripts after settings change`);
-      } else if (languageChanged) {
-        console.log(`Cleared transcript history due to language change`);
+      } catch (err) {
+        console.log(`[SSE] Client ${clientId} send error:`, err);
+        // Client disconnected
+        isAlive = false;
+        userSession.transcripts.removeSSEClient(client);
       }
+    },
+  };
+  console.log(`[SSE] Created client ${clientId}`);
 
-      // Update the processor
-      userTranscriptProcessors.set(userId, newProcessor);
+  // Register client
+  console.log(`[SSE] Registering SSE client for user ${userId}`);
+  userSession.transcripts.addSSEClient(client);
+  console.log(
+    `[SSE] SSE client registered. Total clients: ${userSession.transcripts["sseClients"].size}`,
+  );
 
-      // Show the updated transcript layout immediately with the new formatting
-      const formattedTranscript = newProcessor.processString("", true);
-      this.showTranscriptsToUser(session, formattedTranscript, true);
-
-      // Set up transcription handler for the selected language
-      console.log(`Setting up transcription handlers for session ${sessionId} with language ${locale}`);
-      
-      // Subscribe to language-specific transcription
-      const languageHandler = (data: TranscriptionData) => {
-        this.handleTranscription(session, sessionId, userId, data);
-      };
-      
-      const cleanup = session.onTranscriptionForLanguage(locale, languageHandler);
-      
-      // Register cleanup handler
-      this.addCleanupHandler(cleanup);
-      
-      console.log(`Subscribed to transcriptions in ${locale} for user ${userId}`);
-      
-    } catch (error) {
-      console.error(`Error applying settings for user ${userId}:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * Resets the inactivity timer for a session and schedules text clearing
-   */
-  private resetInactivityTimer(session: AppSession, sessionId: string, userId: string): void {
-    const inactivityTimer = this.inactivityTimers.get(sessionId);
-    if (!inactivityTimer) return;
-
-    // Clear existing timer
-    if (inactivityTimer.timer) {
-      clearTimeout(inactivityTimer.timer);
-    }
-
-    // Update last activity time
-    inactivityTimer.lastActivityTime = Date.now();
-
-    // Schedule transcript processor clearing after 1 minute (60000ms)
-    inactivityTimer.timer = setTimeout(() => {
-      // console.log(`Clearing transcript processor history due to inactivity for session ${sessionId}`);
-      
-      // Clear the transcript processor's history
-      const transcriptProcessor = userTranscriptProcessors.get(userId);
-      if (transcriptProcessor) {
-        // Clear the processor's history
-        transcriptProcessor.clear();
-        
-        // Show empty state to user
-        session.layouts.showTextWall("", {
-          view: ViewType.MAIN,
-          durationMs: 1000, // Brief display to clear the text
-        });
-        
-        // console.log(`Transcript processor history cleared for user ${userId}`);
-      }
-    }, 40000);
-  }
-
-  /**
-   * Called by AppServer when a session is stopped
-   */
-  protected async onStop(sessionId: string, userId: string, reason: string): Promise<void> {
-    console.log(`Session ${sessionId} stopped: ${reason}`);
-    
-    // Clean up session resources
-    const debouncer = this.sessionDebouncers.get(sessionId);
-    if (debouncer?.timer) {
-      clearTimeout(debouncer.timer);
-    }
-    this.sessionDebouncers.delete(sessionId);
-    
-    // Clean up inactivity timer
-    const inactivityTimer = this.inactivityTimers.get(sessionId);
-    if (inactivityTimer?.timer) {
-      clearTimeout(inactivityTimer.timer);
-    }
-    this.inactivityTimers.delete(sessionId);
-    
-    // Remove active session if it matches this session ID
-    const activeSession = this.activeUserSessions.get(userId);
-    if (activeSession && activeSession.sessionId === sessionId) {
-      this.activeUserSessions.delete(userId);
-    }
-
-    // Clear all user-related data from global maps
-    const transcriptProcessorRemoved = userTranscriptProcessors.delete(userId);
-    const activeLanguageRemoved = userActiveLanguages.delete(userId);
-    
-    // console.log(`Cleaned up user ${userId} data: transcriptProcessor=${transcriptProcessorRemoved}, activeLanguage=${activeLanguageRemoved}`);
-  }
-
-  /**
-   * Handles transcription data from the AugmentOS cloud
-   */
-  private handleTranscription(
-    session: AppSession, 
-    sessionId: string, 
-    userId: string, 
-    transcriptionData: any
-  ): void {
-    // Reset inactivity timer when new transcription is received
-    this.resetInactivityTimer(session, sessionId, userId);
-
-    // console.log(`[Session ${JSON.stringify(transcriptionData)}]: Resetting inactivity timer`);
-
-    let transcriptProcessor = userTranscriptProcessors.get(userId);
-    if (!transcriptProcessor) {
-      // Create default processor if none exists
-      transcriptProcessor = new TranscriptProcessor(30, 3, MAX_FINAL_TRANSCRIPTS);
-      userTranscriptProcessors.set(userId, transcriptProcessor);
-    }
-
-    const isFinal = transcriptionData.isFinal;
-    // if (isFinal) {
-    //   console.log(`[Session ${sessionId}]: Received final transcription`);
-    //   return;
-    // }
-    let newTranscript = transcriptionData.text;
-    const language = languageToLocale(transcriptionData.transcribeLanguage);
-
-    console.log(`[Session ${sessionId}]: Received transcription in language: ${language}`);
-
-    // Check if the language is Chinese and user has selected Pinyin format
-    const activeLanguage = userActiveLanguages.get(userId);
-    if (activeLanguage === 'Chinese (Pinyin)') {
-      const pinyinTranscript = convertToPinyin(newTranscript);
-      console.log(`[Session ${sessionId}]: Converting Chinese to Pinyin`);
-      newTranscript = pinyinTranscript;
-    }
-
-    // Process the transcript and get the formatted text
-    const textToDisplay = transcriptProcessor.processString(newTranscript, isFinal);
-    console.log(`[Session ${sessionId}]: ${textToDisplay}`);
-    console.log(`[Session ${sessionId}]: isFinal=${isFinal}`);
-
-    this.debounceAndShowTranscript(session, sessionId, textToDisplay, isFinal);
-  }
-
-  /**
-   * Debounces transcript display to avoid too frequent updates for non-final transcripts
-   */
-  private debounceAndShowTranscript(
-    session: AppSession,
-    sessionId: string,
-    transcript: string,
-    isFinal: boolean
-  ): void {
-    const debounceDelay = 400; // in milliseconds
-    let debouncer = this.sessionDebouncers.get(sessionId);
-    
-    if (!debouncer) {
-      debouncer = { lastSentTime: 0, timer: null };
-      this.sessionDebouncers.set(sessionId, debouncer);
-    }
-
-    // Clear any scheduled timer
-    if (debouncer.timer) {
-      clearTimeout(debouncer.timer);
-      debouncer.timer = null;
-    }
-
-    const now = Date.now();
-
-    // Show final transcripts immediately
-    if (isFinal) {
-      this.showTranscriptsToUser(session, transcript, isFinal);
-      debouncer.lastSentTime = now;
+  // Start heartbeat interval to keep connection alive
+  const heartbeatInterval = setInterval(() => {
+    if (!isAlive) {
+      clearInterval(heartbeatInterval);
       return;
     }
-
-    // Throttle non-final transcripts
-    if (now - debouncer.lastSentTime >= debounceDelay) {
-      this.showTranscriptsToUser(session, transcript, false);
-      debouncer.lastSentTime = now;
-    } else {
-      debouncer.timer = setTimeout(() => {
-        this.showTranscriptsToUser(session, transcript, false);
-        if (debouncer) {
-          debouncer.lastSentTime = Date.now();
-        }
-      }, debounceDelay);
+    try {
+      // Send heartbeat as SSE comment (: prefix) and as data message
+      res.write(`: heartbeat ${Date.now()}\n`);
+      res.write(
+        `data: ${JSON.stringify({ type: "heartbeat", timestamp: Date.now() })}\n\n`,
+      );
+    } catch {
+      // Client disconnected
+      isAlive = false;
+      clearInterval(heartbeatInterval);
+      userSession.transcripts.removeSSEClient(client);
     }
-  }
+  }, SSE_HEARTBEAT_INTERVAL_MS);
 
-  /**
-   * Displays transcript text in the AR view
-   */
-  private showTranscriptsToUser(
-    session: AppSession,
-    transcript: string,
-    isFinal: boolean
-  ): void {
-    const cleanedTranscript = this.cleanTranscriptText(transcript);
+  // Cleanup on disconnect
+  req.on("close", () => {
+    console.log(`[SSE] Connection closed for user ${userId}`);
+    console.log(
+      `[SSE] Clients before removal: ${userSession.transcripts["sseClients"].size}`,
+    );
+    isAlive = false;
+    clearInterval(heartbeatInterval);
+    userSession.transcripts.removeSSEClient(client);
+    console.log(
+      `[SSE] Clients after removal: ${userSession.transcripts["sseClients"].size}`,
+    );
+  });
 
-    session.layouts.showTextWall(cleanedTranscript, {
-      view: ViewType.MAIN,
-      // Use a fixed duration for final transcripts (20 seconds)
-      durationMs: isFinal ? 20000 : undefined,
-    });
-  }
-
-  /**
-   * Cleans the transcript text by removing leading punctuation while preserving Spanish question marks
-   * and Chinese characters
-   */
-  private cleanTranscriptText(text: string): string {
-    // Remove basic punctuation marks (both Western and Chinese)
-    // Western: . , ; : ! ?
-    // Chinese: 。 ， ； ： ！ ？
-    return text.replace(/^[.,;:!?。，；：！？]+/, '').trim();
-  }
-
-  /**
-   * Helper method to get active session for a user
-   */
-  public getActiveSessionForUser(userId: string): { session: AppSession, sessionId: string } | null {
-    return this.activeUserSessions.get(userId) || null;
-  }
-}
-
-// Create and start the app
-const liveCaptionsApp = new LiveCaptionsApp();
-
-
-// Start the server
-liveCaptionsApp.start().then(() => {
-  console.log(`${PACKAGE_NAME} server running on port ${PORT}`);
-}).catch(error => {
-  console.error('Failed to start server:', error);
+  // Also handle error event
+  req.on("error", (err: Error) => {
+    console.log(`[SSE] Connection error for user ${userId}:`, err);
+    isAlive = false;
+    clearInterval(heartbeatInterval);
+    userSession.transcripts.removeSSEClient(client);
+  });
 });
+
+// ============================================
+// Optional: Add Express API routes here
+// ============================================
+// Example Express route that uses auth middleware:
+// expressApp.get("/api/express-example", (req, res) => {
+//   const authReq = req as any
+//   if (authReq.authUserId) {
+//     res.json({ message: "Hello from Express!", userId: authReq.authUserId })
+//   } else {
+//     res.status(401).json({ error: "Not authenticated" })
+//   }
+// })
+
+// ============================================
+// Proxy: Forward unmatched routes to Bun
+// ============================================
+// Add catch-all proxy as LAST route - only matches if no other route did
+// This forwards any unmatched routes to Bun (webview, custom API)
+expressApp.all("*", async (req: Request, res: Response) => {
+  try {
+    const bunUrl = `http://localhost:${BUN_PORT}${req.originalUrl || req.url}`;
+
+    // Debug logging for API requests
+    if (req.originalUrl?.startsWith("/api/")) {
+      const authReq = req as any;
+      console.log(
+        `[PROXY] ${req.method} ${req.originalUrl} - authUserId: ${authReq.authUserId || "NONE"}`,
+      );
+    }
+
+    // Build headers - forward existing headers AND add auth info
+    const proxyHeaders: Record<string, string> = {} as Record<string, string>;
+
+    // Copy existing headers
+    Object.entries(req.headers).forEach(([key, value]) => {
+      if (value) {
+        proxyHeaders[key] = Array.isArray(value) ? value.join(", ") : value;
+      }
+    });
+
+    // Forward authenticated user from Express middleware to Bun
+    const authReq = req as any;
+    if (authReq.authUserId) {
+      proxyHeaders["x-auth-user-id"] = authReq.authUserId;
+    }
+
+    if (authReq.activeSession) {
+      proxyHeaders["x-has-active-session"] = "true";
+    }
+
+    // Proxy request to Bun
+    const response = await fetch(bunUrl, {
+      method: req.method,
+      headers: proxyHeaders as HeadersInit,
+      body:
+        req.method !== "GET" && req.method !== "HEAD"
+          ? JSON.stringify(req.body)
+          : undefined,
+    });
+
+    // Copy response headers
+    response.headers.forEach((value, key) => {
+      res.setHeader(key, value);
+    });
+
+    // Send response
+    res.status(response.status);
+    res.send(await response.text());
+  } catch (error) {
+    console.error("Proxy error:", error);
+    res.status(500).send("Proxy error");
+  }
+});
+
+console.log(`✅ MentraOS AppServer running at http://localhost:${PORT}`);
+console.log(`   - Session endpoints: http://localhost:${PORT}/session-start`);
+console.log(`   - Webhook: http://localhost:${PORT}/webhook`);
+console.log(`   - Webview (proxied): http://localhost:${PORT}\n`);
+
+console.log("🎉 Captions app is ready!");
+console.log(`\n📝 Access the app at: http://localhost:${PORT}\n`);
+
+// ============================================
+// Graceful Shutdown
+// ============================================
+
+const shutdown = async () => {
+  console.log("\n🛑 Shutting down...");
+  captionsApp.stop();
+  process.exit(0);
+};
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
