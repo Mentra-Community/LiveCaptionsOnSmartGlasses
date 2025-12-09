@@ -20,5 +20,5 @@ ENV NODE_ENV=production
 # Expose the port
 EXPOSE 80
 
-# Start the application
-CMD ["bun", "src/index.ts"]
+# dont' Start the application, the porter.yaml file has cmd to start it.
+# CMD ["bun", "src/index.ts"]
