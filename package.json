@@ -12,7 +12,8 @@
     "start": "bun run build:webview && NODE_ENV=development bun src/index.ts"
   },
   "dependencies": {
-    "@mentra/sdk": "2.1.29-beta.2",
+    "@mentra/sdk": "link:@mentra/sdk",
+    "hono": "^4.11.3",
     "@node-rs/jieba": "^2.0.1",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-select": "^2.2.6",
@@ -28,7 +29,6 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/express": "^5.0.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "tailwindcss": "^4.1.11",
