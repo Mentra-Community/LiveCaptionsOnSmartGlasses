@@ -1,17 +1,19 @@
-import { useState } from "react"
+import { useState } from "react";
 
-import { BottomNav } from "./components/BottomNav"
-import { Header } from "./components/Header"
-import { LanguageSelector } from "./components/LanguageSelector"
-import { Settings } from "./components/Settings"
-import { TranscriptList } from "./components/TranscriptList"
-import { useSettings } from "./hooks/useSettings"
-import { useTranscripts } from "./hooks/useTranscripts"
-import "./index.css"
+import { BottomNav } from "./components/BottomNav";
+import { Header } from "./components/Header";
+import { LanguageSelector } from "./components/LanguageSelector";
+import { Settings } from "./components/Settings";
+import { TranscriptList } from "./components/TranscriptList";
+import { useSettings } from "./hooks/useSettings";
+import { useTranscripts } from "./hooks/useTranscripts";
+import "./index.css";
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<"captions" | "settings">("captions")
-  const [showLanguageSelector, setShowLanguageSelector] = useState(false)
+  const [activeTab, setActiveTab] = useState<"captions" | "settings">(
+    "captions",
+  );
+  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
   const {
     settings,
     loading: settingsLoading,
@@ -19,14 +21,24 @@ export function App() {
     updateHints,
     updateDisplayLines,
     updateDisplayWidth,
-  } = useSettings()
-  const { transcripts, connected, error, isRecording, toggleRecording, clearTranscripts, reconnect, displayPreview } = useTranscripts()
+    updateWordBreaking,
+  } = useSettings();
+  const {
+    transcripts,
+    connected,
+    error,
+    isRecording,
+    toggleRecording,
+    clearTranscripts,
+    reconnect,
+    displayPreview,
+  } = useTranscripts();
 
   const handleSaveLanguage = async (language: string, hints: string[]) => {
-    await updateLanguage(language)
-    await updateHints(hints)
-    setShowLanguageSelector(false)
-  }
+    await updateLanguage(language);
+    await updateHints(hints);
+    setShowLanguageSelector(false);
+  };
 
   return (
     <div className="w-screen h-screen bg-zinc-100 flex flex-col overflow-hidden font-sans">
@@ -60,6 +72,7 @@ export function App() {
             displayPreview={displayPreview}
             onUpdateDisplayLines={updateDisplayLines}
             onUpdateDisplayWidth={updateDisplayWidth}
+            onUpdateWordBreaking={updateWordBreaking}
           />
         ) : (
           <TranscriptList
@@ -72,8 +85,10 @@ export function App() {
       </div>
 
       {/* Bottom Navigation */}
-      {!showLanguageSelector && <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />}
+      {!showLanguageSelector && (
+        <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+      )}
     </div>
-  )
+  );
 }
-export default App
+export default App;

@@ -18,6 +18,7 @@ export class DisplayManager {
   // Current display settings
   private currentDisplayWidthPx: number = G1_PROFILE_LEGACY.displayWidthPx;
   private currentMaxLines: number = G1_PROFILE_LEGACY.maxLines;
+  private currentWordBreaking: boolean = true;
 
   constructor(userSession: UserSession) {
     this.userSession = userSession;
@@ -27,7 +28,7 @@ export class DisplayManager {
     // Using character breaking mode for 100% line utilization
     this.formatter = new CaptionsFormatter(G1_PROFILE_LEGACY, {
       maxFinalTranscripts: 30,
-      useCharacterBreaking: true,
+      breakMode: this.currentWordBreaking ? "character" : "word",
       displayWidthPx: this.currentDisplayWidthPx,
       maxLines: this.currentMaxLines,
     });
@@ -38,8 +39,13 @@ export class DisplayManager {
    *
    * @param displayWidth - Display width setting: 0=Narrow (50%), 1=Medium (75%), 2=Wide (100%)
    * @param numberOfLines - Maximum number of lines to display (2-5)
+   * @param wordBreaking - Whether to break words with hyphens (true) or only at word boundaries (false)
    */
-  updateSettings(displayWidth: number, numberOfLines: number): void {
+  updateSettings(
+    displayWidth: number,
+    numberOfLines: number,
+    wordBreaking: boolean = true,
+  ): void {
     // Convert width setting to pixels as percentage of max display width
     // 0 = Narrow (50%), 1 = Medium (75%), 2 = Wide (100%)
     const maxWidthPx = G1_PROFILE_LEGACY.displayWidthPx;
@@ -58,20 +64,23 @@ export class DisplayManager {
     }
     this.currentDisplayWidthPx = Math.round(maxWidthPx * widthPercent);
     this.currentMaxLines = Math.min(Math.max(2, numberOfLines), 5); // Clamp between 2-5
+    this.currentWordBreaking = wordBreaking;
 
     this.logger.info(
       `Settings update: displayWidth=${displayWidth} (${widthPercent * 100}% = ${
         this.currentDisplayWidthPx
-      }px), lines=${this.currentMaxLines}`,
+      }px), lines=${this.currentMaxLines}, wordBreaking=${this.currentWordBreaking}`,
     );
 
     // Get previous transcript history to preserve it
     const previousHistory = this.formatter.getFinalTranscriptHistory();
 
     // Create new formatter with updated settings
+    // breakMode: 'character' = break mid-word with hyphens for 100% utilization
+    // breakMode: 'word' = break at word boundaries only (no hyphens mid-word)
     this.formatter = new CaptionsFormatter(G1_PROFILE_LEGACY, {
       maxFinalTranscripts: 30,
-      useCharacterBreaking: true,
+      breakMode: this.currentWordBreaking ? "character" : "word",
       displayWidthPx: this.currentDisplayWidthPx,
       maxLines: this.currentMaxLines,
     });

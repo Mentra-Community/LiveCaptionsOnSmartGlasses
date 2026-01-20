@@ -2,7 +2,7 @@
   push:
     branches:
       - main
-name: "[prod] Deploy Captions 🚀"
+name: "[prod] Deploy captions 🚀"
 jobs:
   us-central:
     runs-on: ubuntu-latest
