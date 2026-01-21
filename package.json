@@ -12,7 +12,7 @@
     "start": "bun run build:webview && NODE_ENV=development bun src/index.ts"
   },
   "dependencies": {
-    "@mentra/sdk": "2.1.29-beta.2",
+    "@mentra/sdk": "2.1.31-beta.5",
     "@node-rs/jieba": "^2.0.1",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-select": "^2.2.6",

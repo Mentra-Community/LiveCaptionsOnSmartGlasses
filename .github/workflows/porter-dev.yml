@@ -1,8 +1,8 @@
 "on":
   push:
     branches:
-      - beta
-name: "[beta] Deploy captions-beta 🚀🧪"
+      - dev
+name: "[dev] Deploy captions-dev 🚀🧪"
 jobs:
   us-central:
     runs-on: ubuntu-latest
@@ -18,8 +18,8 @@ jobs:
         timeout-minutes: 30
         run: exec porter apply -f ./porter.yaml
         env:
-          PORTER_APP_NAME: captions-beta
-          PORTER_NAMESPACE: prod
+          PORTER_APP_NAME: captions-dev
+          PORTER_NAMESPACE: dev
           NODE_ENV: production
           PORTER_CLUSTER: "4689"
           PORTER_DEPLOYMENT_TARGET_ID: 4a24a192-04c8-421f-8fc2-22db1714fdc0
