@@ -5,6 +5,7 @@
   "module": "src/index.ts",
   "scripts": {
     "dev": "bun --watch src/index.ts",
+    "dev:docker": "docker build -f docker/Dockerfile -t live-captions-test . && docker run --rm -it -p 3333:3333 -e NODE_ENV=development -e HOST=0.0.0.0 live-captions-test bun run start",
     "test": "bun test src/app/utils",
     "ngrok": "ngrok http 3333 --url https://isaiah-tpa.ngrok.app",
     "build:webview": "bun run build.ts",

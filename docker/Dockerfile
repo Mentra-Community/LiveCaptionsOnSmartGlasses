@@ -19,6 +19,10 @@ RUN bunx tsc -p tsconfig.json
 # Return to app directory
 WORKDIR /app
 
+# Re-install to refresh bun's module resolution after display-utils is built
+# This ensures bun can properly resolve @mentra/display-utils with its dist/ folder
+RUN bun install
+
 # Copy the rest of the application code
 COPY . .
 
