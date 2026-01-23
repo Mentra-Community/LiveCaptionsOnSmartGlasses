@@ -1,4 +1,9 @@
-import { ViewType } from "@mentra/sdk";
+import {
+  ViewType,
+  type AppSession,
+  type DeviceState,
+  type Observable,
+} from "@mentra/sdk";
 
 import {
   CaptionsFormatter,
@@ -9,6 +14,11 @@ import {
   type TranscriptHistoryEntry,
 } from "../utils/CaptionsFormatter";
 import { UserSession } from "./UserSession";
+
+// Type for the device object on AppSession
+interface DeviceWithState {
+  state: DeviceState;
+}
 
 /**
  * Map device model names to display profiles
@@ -54,63 +64,87 @@ function getProfileForModel(
 
 /**
  * Safely get the device model name from AppSession
- * Works with both old SDK (no device property) and new SDK (has device.modelName)
+ * Uses SDK's device.state.modelName Observable API
  */
 function getDeviceModelName(
-  appSession: UserSession["appSession"],
+  appSession: AppSession,
+  logger?: UserSession["logger"],
 ): string | null {
   try {
-    // Try new SDK device state API
-    const device = (appSession as any).device;
-    if (device?.modelName?.value) {
-      return device.modelName.value;
+    // Access device.state from AppSession (SDK provides this)
+    const device = appSession.device as DeviceWithState | undefined;
+    const deviceState = device?.state;
+
+    logger?.debug(`[getDeviceModelName] device.state exists: ${!!deviceState}`);
+
+    if (deviceState?.modelName) {
+      // modelName is an Observable<string | null>
+      const modelNameObservable = deviceState.modelName as Observable<
+        string | null
+      >;
+      const modelName = modelNameObservable.value;
+      logger?.debug(
+        `[getDeviceModelName] device.state.modelName.value: ${modelName}`,
+      );
+      if (modelName) {
+        logger?.info(
+          `[getDeviceModelName] Found model via device.state.modelName.value: ${modelName}`,
+        );
+        return modelName;
+      }
     }
-    // Fallback: check capabilities
-    const capabilities = (appSession as any).capabilities;
-    if (capabilities?.modelName) {
-      return capabilities.modelName;
-    }
-  } catch {
-    // Ignore errors, return null
+
+    logger?.warn(`[getDeviceModelName] No model name found in device.state`);
+  } catch (err) {
+    logger?.error(`[getDeviceModelName] Error: ${err}`);
   }
   return null;
 }
 
 /**
- * Safely subscribe to device model changes
+ * Subscribe to device model changes using SDK's Observable API
  * Returns cleanup function or null if subscription not available
  */
 function subscribeToDeviceModel(
-  appSession: UserSession["appSession"],
+  appSession: AppSession,
   callback: (modelName: string | null) => void,
+  logger?: UserSession["logger"],
 ): (() => void) | null {
   try {
-    // Try new SDK device state API
-    const device = (appSession as any).device;
-    if (device?.modelName?.subscribe) {
-      return device.modelName.subscribe(callback);
+    // Access device.state from AppSession
+    const device = appSession.device as DeviceWithState | undefined;
+    const deviceState = device?.state;
+
+    logger?.debug(
+      `[subscribeToDeviceModel] device.state exists: ${!!deviceState}`,
+    );
+
+    if (deviceState?.modelName) {
+      const modelNameObservable = deviceState.modelName as Observable<
+        string | null
+      >;
+
+      logger?.debug(
+        `[subscribeToDeviceModel] device.state.modelName.onChange exists: ${!!modelNameObservable.onChange}`,
+      );
+
+      if (modelNameObservable.onChange) {
+        logger?.info(
+          `[subscribeToDeviceModel] Using device.state.modelName.onChange`,
+        );
+        // Observable.onChange returns a cleanup function
+        return modelNameObservable.onChange((value: string | null) => {
+          logger?.info(
+            `[subscribeToDeviceModel] 🔔 CALLBACK FIRED! modelName = ${value}`,
+          );
+          callback(value);
+        });
+      }
     }
 
-    // Try capabilities_update event
-    const events = appSession.events;
-    if (events?.on) {
-      const handler = (data: { modelName?: string | null }) => {
-        if (data.modelName !== undefined) {
-          callback(data.modelName);
-        }
-      };
-      events.on("capabilities_update", handler);
-      // Return cleanup function
-      return () => {
-        try {
-          (events as any).off?.("capabilities_update", handler);
-        } catch {
-          // Ignore cleanup errors
-        }
-      };
-    }
-  } catch {
-    // Ignore errors
+    logger?.warn(`[subscribeToDeviceModel] No subscription method available`);
+  } catch (err) {
+    logger?.error(`[subscribeToDeviceModel] Error: ${err}`);
   }
   return null;
 }
@@ -139,13 +173,26 @@ export class DisplayManager {
     this.logger = userSession.logger.child({ service: "DisplayManager" });
 
     // Detect initial device model
-    const initialModel = getDeviceModelName(userSession.appSession);
+    const initialModel = getDeviceModelName(
+      userSession.appSession,
+      this.logger,
+    );
     this.currentProfile = getProfileForModel(initialModel);
     this.currentDisplayWidthPx = this.currentProfile.displayWidthPx;
     this.currentMaxLines = this.currentProfile.maxLines;
 
     this.logger.info(
       `Initializing DisplayManager with profile: ${this.currentProfile.id} (model: ${initialModel || "unknown"})`,
+    );
+    this.logger.info(
+      `Profile details: displayWidthPx=${this.currentProfile.displayWidthPx}, maxLines=${this.currentProfile.maxLines}, defaultGlyphWidth=${this.currentProfile.fontMetrics.defaultGlyphWidth}`,
+    );
+    // Log a sample measurement to verify glyph widths are correct
+    const testChar = "a";
+    const testCharWidth =
+      this.currentProfile.fontMetrics.glyphWidths.get(testChar);
+    this.logger.info(
+      `Profile glyph check: '${testChar}' width = ${testCharWidth}px (should be 12 for Z100)`,
     );
 
     // Initialize formatter with detected profile
@@ -169,6 +216,7 @@ export class DisplayManager {
     this.deviceStateCleanup = subscribeToDeviceModel(
       this.userSession.appSession,
       (modelName: string | null) => {
+        this.logger.info(`🔔 Device model callback received: ${modelName}`);
         const newProfile = getProfileForModel(modelName);
 
         if (newProfile.id !== this.currentProfile.id) {
@@ -176,8 +224,13 @@ export class DisplayManager {
             `Device model changed: ${modelName} -> switching to profile ${newProfile.id}`,
           );
           this.updateProfile(newProfile);
+        } else {
+          this.logger.info(
+            `Device model ${modelName} maps to same profile ${newProfile.id}, no change needed`,
+          );
         }
       },
+      this.logger,
     );
 
     if (this.deviceStateCleanup) {
