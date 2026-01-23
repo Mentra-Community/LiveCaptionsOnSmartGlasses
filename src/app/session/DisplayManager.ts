@@ -29,8 +29,13 @@ function getProfileForModel(
     return G1_PROFILE;
   }
 
-  // Vuzix Z100
-  if (lower.includes("z100") || lower.includes("vuzix")) {
+  // Vuzix Z100 and Mentra Mach1 (same hardware)
+  if (
+    lower.includes("z100") ||
+    lower.includes("vuzix") ||
+    lower.includes("mach1") ||
+    lower.includes("mach 1")
+  ) {
     return Z100_PROFILE;
   }
 
