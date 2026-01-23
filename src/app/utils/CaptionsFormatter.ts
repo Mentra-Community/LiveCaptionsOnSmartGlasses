@@ -21,8 +21,219 @@ import {
   type WrapResult,
 } from "@mentra/sdk/display-utils";
 
+// =============================================================================
+// Local Profile Definitions
+// =============================================================================
+// These profiles are defined locally until the SDK is updated with Z100/NEX support.
+// Once SDK exports these profiles, we can remove these and import from SDK instead.
+
+/**
+ * Vuzix Z100 Smart Glasses Display Profile
+ * Uses Noto Sans font with extracted glyph metrics.
+ */
+const Z100_GLYPH_WIDTHS: Record<string, number> = {
+  " ": 5,
+  "!": 5,
+  '"': 7,
+  "#": 12,
+  $: 11,
+  "%": 16,
+  "&": 14,
+  "'": 4,
+  "(": 6,
+  ")": 6,
+  "*": 9,
+  "+": 12,
+  ",": 5,
+  "-": 7,
+  ".": 5,
+  "/": 7,
+  "0": 11,
+  "1": 11,
+  "2": 11,
+  "3": 11,
+  "4": 11,
+  "5": 11,
+  "6": 11,
+  "7": 11,
+  "8": 11,
+  "9": 11,
+  ":": 5,
+  ";": 5,
+  "<": 12,
+  "=": 12,
+  ">": 12,
+  "?": 9,
+  "@": 18,
+  A: 13,
+  B: 12,
+  C: 12,
+  D: 13,
+  E: 11,
+  F: 10,
+  G: 13,
+  H: 14,
+  I: 5,
+  J: 5,
+  K: 12,
+  L: 10,
+  M: 17,
+  N: 14,
+  O: 14,
+  P: 11,
+  Q: 14,
+  R: 12,
+  S: 10,
+  T: 11,
+  U: 13,
+  V: 12,
+  W: 18,
+  X: 12,
+  Y: 11,
+  Z: 11,
+  "[": 6,
+  "\\": 7,
+  "]": 6,
+  "^": 12,
+  _: 9,
+  "`": 7,
+  a: 10,
+  b: 11,
+  c: 9,
+  d: 11,
+  e: 10,
+  f: 7,
+  g: 11,
+  h: 11,
+  i: 5,
+  j: 5,
+  k: 10,
+  l: 5,
+  m: 17,
+  n: 11,
+  o: 11,
+  p: 11,
+  q: 11,
+  r: 7,
+  s: 9,
+  t: 7,
+  u: 11,
+  v: 10,
+  w: 15,
+  x: 10,
+  y: 10,
+  z: 9,
+  "{": 7,
+  "|": 5,
+  "}": 7,
+  "~": 12,
+};
+
+export const Z100_PROFILE: DisplayProfile = {
+  id: "vuzix-z100",
+  name: "Vuzix Z100",
+  displayWidthPx: 600,
+  maxLines: 7,
+  maxPayloadBytes: 500,
+  bleChunkSize: 200,
+  fontMetrics: {
+    glyphWidths: new Map(Object.entries(Z100_GLYPH_WIDTHS)),
+    defaultGlyphWidth: 11,
+    renderFormula: (glyphWidth: number) => glyphWidth,
+    uniformScripts: {
+      cjk: 21,
+      hiragana: 21,
+      katakana: 21,
+      korean: 21,
+      cyrillic: 12,
+    },
+    fallback: {
+      latinMaxWidth: 18,
+      unknownBehavior: "useLatinMax",
+    },
+  },
+  constraints: {
+    minCharsBeforeHyphen: 3,
+    noStartChars: [
+      ".",
+      ",",
+      "!",
+      "?",
+      ":",
+      ";",
+      ")",
+      "]",
+      "}",
+      "。",
+      "，",
+      "！",
+      "？",
+      "：",
+      "；",
+      "）",
+      "】",
+      "」",
+    ],
+    noEndChars: ["(", "[", "{", "（", "【", "「"],
+  },
+};
+
+/**
+ * Mentra Nex (Mentra Display) Smart Glasses Display Profile
+ * Placeholder values - update when actual device specs are available.
+ */
+export const NEX_PROFILE: DisplayProfile = {
+  id: "mentra-nex",
+  name: "Mentra Nex",
+  displayWidthPx: 576,
+  maxLines: 5,
+  maxPayloadBytes: 390,
+  bleChunkSize: 176,
+  fontMetrics: {
+    glyphWidths: new Map(Object.entries(Z100_GLYPH_WIDTHS)), // Placeholder - uses Z100 widths
+    defaultGlyphWidth: 11,
+    renderFormula: (glyphWidth: number) => glyphWidth,
+    uniformScripts: {
+      cjk: 21,
+      hiragana: 21,
+      katakana: 21,
+      korean: 21,
+      cyrillic: 12,
+    },
+    fallback: {
+      latinMaxWidth: 18,
+      unknownBehavior: "useLatinMax",
+    },
+  },
+  constraints: {
+    minCharsBeforeHyphen: 3,
+    noStartChars: [
+      ".",
+      ",",
+      "!",
+      "?",
+      ":",
+      ";",
+      ")",
+      "]",
+      "}",
+      "。",
+      "，",
+      "！",
+      "？",
+      "：",
+      "；",
+      "）",
+      "】",
+      "」",
+    ],
+    noEndChars: ["(", "[", "{", "（", "【", "「"],
+  },
+};
+
 // Re-export profiles for convenience
 export { G1_PROFILE, G1_PROFILE_LEGACY };
+export type { DisplayProfile };
 
 /**
  * Entry in the transcript history that preserves speaker information.
@@ -39,7 +250,14 @@ export interface TranscriptHistoryEntry {
 export interface CaptionsFormatterOptions {
   /** Maximum number of final transcripts to keep in history */
   maxFinalTranscripts?: number;
-  /** Break mode for text wrapping */
+  /**
+   * Break mode for text wrapping:
+   * - 'character': Break mid-word with hyphen
+   * - 'word': Break at word boundaries, hyphenate only if word > line width
+   * - 'strict-word': Break at word boundaries only, no hyphenation
+   *
+   * Note: 'character-no-hyphen' is not yet in SDK, so we use 'character' as fallback
+   */
   breakMode?: "character" | "word" | "strict-word";
   /** Whether to use character-level breaking for 100% utilization */
   useCharacterBreaking?: boolean;
@@ -114,6 +332,8 @@ export class CaptionsFormatter {
     this.maxLines = options.maxLines ?? profile.maxLines;
 
     // Determine break mode
+    // Default to character breaking for 100% line utilization
+    // Note: Once SDK supports 'character-no-hyphen', we should switch to that
     const breakMode =
       options.breakMode ??
       (options.useCharacterBreaking !== false ? "character" : "word");
