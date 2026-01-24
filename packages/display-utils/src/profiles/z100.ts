@@ -1,4 +1,4 @@
-import {DisplayProfile} from "./types"
+import { DisplayProfile } from "./types";
 
 /**
  * Vuzix Z100 glyph widths - extracted from NotoSans-Regular.ttf at 21px
@@ -14,7 +14,7 @@ const Z100_GLYPH_WIDTHS: Record<string, number> = {
   "!": 6,
   '"': 9,
   "#": 14,
-  "$": 12,
+  $: 12,
   "%": 17,
   "&": 15,
   "'": 5,
@@ -49,75 +49,75 @@ const Z100_GLYPH_WIDTHS: Record<string, number> = {
   "@": 19,
 
   // Uppercase
-  "A": 13,
-  "B": 14,
-  "C": 13,
-  "D": 15,
-  "E": 12,
-  "F": 11,
-  "G": 15,
-  "H": 16,
-  "I": 7,
-  "J": 6,
-  "K": 13,
-  "L": 11,
-  "M": 19,
-  "N": 16,
-  "O": 16,
-  "P": 13,
-  "Q": 16,
-  "R": 13,
-  "S": 12,
-  "T": 12,
-  "U": 15,
-  "V": 13,
-  "W": 20,
-  "X": 12,
-  "Y": 12,
-  "Z": 12,
+  A: 13,
+  B: 14,
+  C: 13,
+  D: 15,
+  E: 12,
+  F: 11,
+  G: 15,
+  H: 16,
+  I: 7,
+  J: 6,
+  K: 13,
+  L: 11,
+  M: 19,
+  N: 16,
+  O: 16,
+  P: 13,
+  Q: 16,
+  R: 13,
+  S: 12,
+  T: 12,
+  U: 15,
+  V: 13,
+  W: 20,
+  X: 12,
+  Y: 12,
+  Z: 12,
 
   // Brackets & special
   "[": 7,
   "\\": 8,
   "]": 7,
   "^": 12,
-  "_": 9,
+  _: 9,
   "`": 6,
 
   // Lowercase
-  "a": 12,
-  "b": 13,
-  "c": 10,
-  "d": 13,
-  "e": 12,
-  "f": 7,
-  "g": 13,
-  "h": 13,
-  "i": 5,
-  "j": 5,
-  "k": 11,
-  "l": 5,
-  "m": 20,
-  "n": 13,
-  "o": 13,
-  "p": 13,
-  "q": 13,
-  "r": 9,
-  "s": 10,
-  "t": 8,
-  "u": 13,
-  "v": 11,
-  "w": 17,
-  "x": 11,
-  "y": 11,
-  "z": 10,
+  a: 12,
+  b: 13,
+  c: 10,
+  d: 13,
+  e: 12,
+  f: 7,
+  g: 13,
+  h: 13,
+  i: 5,
+  j: 5,
+  k: 11,
+  l: 5,
+  m: 20,
+  n: 13,
+  o: 13,
+  p: 13,
+  q: 13,
+  r: 9,
+  s: 10,
+  t: 8,
+  u: 13,
+  v: 11,
+  w: 17,
+  x: 11,
+  y: 11,
+  z: 10,
 
   // More special
   "{": 8,
   "|": 12,
   "}": 8,
   "~": 12,
-}
+};
 
 /**
  * Vuzix Z100 Smart Glasses Display Profile
@@ -129,7 +129,7 @@ const Z100_GLYPH_WIDTHS: Record<string, number> = {
  * - Resolution: 640x480
  * - Usable text width: ~390px (empirically tested - SDK applies margins)
  * - Color: Green monochrome
- * - Max text lines: 5 (empirically tested)
+ * - Max text lines: 7
  * - Font: Noto Sans Regular at 21px
  * - No bitmap support via text commands
  * - Adjustable brightness
@@ -147,7 +147,7 @@ export const Z100_PROFILE: DisplayProfile = {
   // Empirically tested: ~42 chars of mixed text (387px) fits before SDK wraps
   // Using 390px to account for measurement variance
   displayWidthPx: 390,
-  maxLines: 5,
+  maxLines: 7,
 
   // BLE constraints
   // Z100 uses Vuzix Ultralite SDK which handles chunking internally
@@ -180,19 +180,38 @@ export const Z100_PROFILE: DisplayProfile = {
 
   constraints: {
     minCharsBeforeHyphen: 3,
-    noStartChars: [".", ",", "!", "?", ":", ";", ")", "]", "}", "。", "，", "！", "？", "：", "；", "）", "】", "」"],
+    noStartChars: [
+      ".",
+      ",",
+      "!",
+      "?",
+      ":",
+      ";",
+      ")",
+      "]",
+      "}",
+      "。",
+      "，",
+      "！",
+      "？",
+      "：",
+      "；",
+      "）",
+      "】",
+      "」",
+    ],
     noEndChars: ["(", "[", "{", "（", "【", "「"],
   },
-}
+};
 
 /**
  * Get the hyphen width for Z100 in pixels.
  * Used for line breaking calculations.
  */
-export const Z100_HYPHEN_WIDTH_PX = 7
+export const Z100_HYPHEN_WIDTH_PX = 7;
 
 /**
  * Get the space width for Z100 in pixels.
  * Used for column alignment calculations.
  */
-export const Z100_SPACE_WIDTH_PX = 5
+export const Z100_SPACE_WIDTH_PX = 5;
