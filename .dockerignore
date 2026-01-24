@@ -1,0 +1,34 @@
+# Dependencies - reinstalled in container for correct architecture
+node_modules/
+packages/*/node_modules/
+
+# Build outputs - rebuilt in container
+packages/*/dist/
+dist/
+
+# Development files
+#.env
+#.env.local
+#.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test coverage
+coverage/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
