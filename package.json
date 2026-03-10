@@ -5,16 +5,17 @@
   "module": "src/index.ts",
   "scripts": {
     "dev": "bun --watch src/index.ts",
-    "dev:docker": "docker build -f docker/Dockerfile -t live-captions-test . && docker run --rm -it -p 3333:3333 -e NODE_ENV=development -e HOST=0.0.0.0 live-captions-test bun run start",
+    "dev:docker": "docker build -f docker/Dockerfile -t live-captions-test . && docker run --rm -it -p 3000:3000 -e NODE_ENV=development -e HOST=0.0.0.0 live-captions-test bun run start",
     "test": "bun test src/app/utils",
-    "ngrok": "ngrok http 3333 --url https://isaiah-tpa.ngrok.app",
+    "ngrok": "ngrok http 3000 --url https://isaiah-tpa.ngrok.app",
     "build:webview": "bun run build.ts",
     "prebuild": "bun run build:webview",
     "start": "bun run build:webview && NODE_ENV=development bun src/index.ts"
   },
   "dependencies": {
-    "@mentra/display-utils": "file:./packages/display-utils",
-    "@mentra/sdk": "2.1.31-beta.5",
+    "@mentra/sdk": "3.0.0-hono.7",
+    "@mentra/react": "^2.1.2",
+    "hono": "^4.11.1",
     "@node-rs/jieba": "^2.0.1",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-select": "^2.2.6",
@@ -30,7 +31,6 @@
   },
   "devDependencies": {
     "@types/bun": "latest",
-    "@types/express": "^5.0.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "tailwindcss": "^4.1.11",
