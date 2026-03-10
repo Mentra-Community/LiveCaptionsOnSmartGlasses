@@ -1,42 +1,42 @@
-import {randomUUID} from "crypto"
+import { randomUUID } from "crypto";
 
-import {TranscriptionData} from "@mentra/sdk"
+import { TranscriptionData } from "@mentra/sdk";
 
-import {UserSession} from "./UserSession"
-import {convertToPinyin} from "../utils/ChineseUtils"
+import { UserSession } from "./UserSession";
+import { convertToPinyin } from "../utils/ChineseUtils";
 
 export interface TranscriptEntry {
-  id: string
-  utteranceId: string | null
-  speaker: string
-  text: string
-  timestamp: string | null
-  isFinal: boolean
-  receivedAt: number
+  id: string;
+  utteranceId: string | null;
+  speaker: string;
+  text: string;
+  timestamp: number | null; // Unix epoch ms — formatted client-side in user's timezone
+  isFinal: boolean;
+  receivedAt: number;
 }
 
 interface SSEClient {
-  send(data: any): void
+  send(data: any): void;
 }
 
 interface CaptionSettings {
-  language: string
-  languageHints: string[]
-  displayLines: number
-  displayWidth: number
+  language: string;
+  languageHints: string[];
+  displayLines: number;
+  displayWidth: number;
 }
 
 export class TranscriptsManager {
-  readonly userSession: UserSession
-  readonly logger: UserSession["logger"]
+  readonly userSession: UserSession;
+  readonly logger: UserSession["logger"];
 
-  private transcripts: TranscriptEntry[] = []
-  private maxTranscripts = 100
-  private sseClients: Set<SSEClient> = new Set()
+  private transcripts: TranscriptEntry[] = [];
+  private maxTranscripts = 100;
+  private sseClients: Set<SSEClient> = new Set();
 
   constructor(userSession: UserSession) {
-    this.userSession = userSession
-    this.logger = userSession.logger.child({service: "TranscriptsManager"})
+    this.userSession = userSession;
+    this.logger = userSession.logger.child({ service: "TranscriptsManager" });
     // Note: No subscription here - UserSession owns the transcription subscription
     // and calls handleTranscription() directly
   }
@@ -45,7 +45,9 @@ export class TranscriptsManager {
    * Handle incoming transcription data from UserSession
    * This is the single entry point for all transcription processing
    */
-  public async handleTranscription(transcriptData: TranscriptionData): Promise<void> {
+  public async handleTranscription(
+    transcriptData: TranscriptionData,
+  ): Promise<void> {
     this.logger.info(
       {
         text: transcriptData.text,
@@ -54,32 +56,32 @@ export class TranscriptsManager {
         speakerId: transcriptData.speakerId,
       },
       `Received transcription: ${transcriptData.text} (final: ${transcriptData.isFinal})`,
-    )
+    );
 
     // 1. Create entry and update transcript list
-    const entry = this.createEntry(transcriptData)
+    const entry = this.createEntry(transcriptData);
 
     if (transcriptData.utteranceId) {
       // New utteranceId-based tracking
-      this.updateByUtteranceId(entry)
+      this.updateByUtteranceId(entry);
     } else {
       // Backwards compatibility: old behavior without utteranceId
       if (transcriptData.isFinal) {
-        this.legacyReplaceInterim(entry)
+        this.legacyReplaceInterim(entry);
       } else {
-        this.legacyUpdateInterim(entry)
+        this.legacyUpdateInterim(entry);
       }
     }
 
     // 2. Broadcast transcript update to webview (transcript list)
-    this.broadcast(entry)
+    this.broadcast(entry);
 
     // 3. Process text for display (handle Pinyin conversion, etc.)
-    let displayText = transcriptData.text
-    const activeLanguage = await this.userSession.settings.getLanguage()
+    let displayText = transcriptData.text;
+    const activeLanguage = await this.userSession.settings.getLanguage();
     if (activeLanguage === "Chinese (Pinyin)") {
-      displayText = convertToPinyin(displayText)
-      this.logger.debug("Converting Chinese to Pinyin for display")
+      displayText = convertToPinyin(displayText);
+      this.logger.debug("Converting Chinese to Pinyin for display");
     }
 
     // 4. Update glasses display via DisplayManager
@@ -88,25 +90,25 @@ export class TranscriptsManager {
       displayText,
       transcriptData.isFinal,
       transcriptData.speakerId,
-    )
+    );
   }
 
   private createEntry(data: TranscriptionData): TranscriptEntry {
     // Use utteranceId if available, otherwise generate a random ID
-    const id = data.utteranceId || randomUUID()
+    const id = data.utteranceId || randomUUID();
 
     // Use speakerId from diarization if available, otherwise default
-    const speaker = this.formatSpeakerId(data.speakerId)
+    const speaker = this.formatSpeakerId(data.speakerId);
 
     return {
       id,
       utteranceId: data.utteranceId || null,
       speaker,
       text: data.text,
-      timestamp: data.isFinal ? this.formatTimestamp(new Date()) : null,
+      timestamp: data.isFinal ? Date.now() : null,
       isFinal: data.isFinal,
       receivedAt: Date.now(),
-    }
+    };
   }
 
   /**
@@ -114,10 +116,10 @@ export class TranscriptsManager {
    */
   private formatSpeakerId(speakerId: string | undefined): string {
     if (!speakerId) {
-      return "Speaker 1" // Default when no speaker info
+      return "Speaker 1"; // Default when no speaker info
     }
     // Soniox returns "1", "2", etc. - format as "Speaker 1", "Speaker 2"
-    return `Speaker ${speakerId}`
+    return `Speaker ${speakerId}`;
   }
 
   /**
@@ -125,41 +127,43 @@ export class TranscriptsManager {
    * This handles both interim updates and interim->final transitions correctly
    */
   private updateByUtteranceId(entry: TranscriptEntry): void {
-    const existingIndex = this.transcripts.findIndex((t) => t.utteranceId === entry.utteranceId)
+    const existingIndex = this.transcripts.findIndex(
+      (t) => t.utteranceId === entry.utteranceId,
+    );
 
     if (existingIndex >= 0) {
       // Replace existing entry (interim->interim or interim->final)
-      this.transcripts[existingIndex] = entry
+      this.transcripts[existingIndex] = entry;
       this.logger.debug(
         {
           utteranceId: entry.utteranceId,
           isFinal: entry.isFinal,
         },
         `Updated transcript for utterance`,
-      )
+      );
     } else {
       // New utterance
-      this.transcripts.push(entry)
+      this.transcripts.push(entry);
       this.logger.debug(
         {
           utteranceId: entry.utteranceId,
           isFinal: entry.isFinal,
         },
         `Added new transcript for utterance`,
-      )
+      );
     }
 
     // Enforce max transcripts limit (keep only final transcripts when trimming)
     if (this.transcripts.length > this.maxTranscripts) {
       // Keep recent transcripts, preferring finals
-      const finals = this.transcripts.filter((t) => t.isFinal)
-      const interims = this.transcripts.filter((t) => !t.isFinal)
+      const finals = this.transcripts.filter((t) => t.isFinal);
+      const interims = this.transcripts.filter((t) => !t.isFinal);
 
       // Keep all interims (they're current) and trim finals from the beginning
-      const maxFinals = this.maxTranscripts - interims.length
-      const trimmedFinals = finals.slice(-maxFinals)
+      const maxFinals = this.maxTranscripts - interims.length;
+      const trimmedFinals = finals.slice(-maxFinals);
 
-      this.transcripts = [...trimmedFinals, ...interims]
+      this.transcripts = [...trimmedFinals, ...interims];
     }
   }
 
@@ -168,12 +172,12 @@ export class TranscriptsManager {
    */
   private legacyUpdateInterim(entry: TranscriptEntry): void {
     // Remove all existing interim transcripts
-    this.transcripts = this.transcripts.filter((t) => t.isFinal)
+    this.transcripts = this.transcripts.filter((t) => t.isFinal);
 
     // Add new interim
-    this.transcripts.push(entry)
+    this.transcripts.push(entry);
 
-    this.logger.debug(`Legacy: Updated interim transcript: ${entry.text}`)
+    this.logger.debug(`Legacy: Updated interim transcript: ${entry.text}`);
   }
 
   /**
@@ -181,26 +185,17 @@ export class TranscriptsManager {
    */
   private legacyReplaceInterim(entry: TranscriptEntry): void {
     // Remove all interim transcripts
-    this.transcripts = this.transcripts.filter((t) => t.isFinal)
+    this.transcripts = this.transcripts.filter((t) => t.isFinal);
 
     // Add final transcript
-    this.transcripts.push(entry)
+    this.transcripts.push(entry);
 
     // Enforce max transcripts limit
     if (this.transcripts.length > this.maxTranscripts) {
-      this.transcripts = this.transcripts.slice(-this.maxTranscripts)
+      this.transcripts = this.transcripts.slice(-this.maxTranscripts);
     }
 
-    this.logger.debug(`Legacy: Added final transcript: ${entry.text}`)
-  }
-
-  private formatTimestamp(date: Date): string {
-    const hours = date.getHours()
-    const minutes = date.getMinutes()
-    const ampm = hours >= 12 ? "PM" : "AM"
-    const displayHours = hours % 12 || 12
-    const displayMinutes = minutes.toString().padStart(2, "0")
-    return `${displayHours}:${displayMinutes} ${ampm}`
+    this.logger.debug(`Legacy: Added final transcript: ${entry.text}`);
   }
 
   private broadcast(entry: TranscriptEntry): void {
@@ -211,7 +206,7 @@ export class TranscriptsManager {
       speaker: entry.speaker,
       text: entry.text,
       timestamp: entry.timestamp,
-    }
+    };
 
     this.logger.info(
       {
@@ -220,52 +215,60 @@ export class TranscriptsManager {
         text: message.text.substring(0, 50),
       },
       `📡 Broadcasting to ${this.sseClients.size} SSE clients`,
-    )
+    );
 
     if (this.sseClients.size === 0) {
-      this.logger.warn("No SSE clients connected - transcript will not reach webview")
+      this.logger.warn(
+        "No SSE clients connected - transcript will not reach webview",
+      );
     }
 
     for (const client of this.sseClients) {
       try {
-        client.send(message)
-        this.logger.debug("Successfully sent to SSE client")
+        client.send(message);
+        this.logger.debug("Successfully sent to SSE client");
       } catch (error) {
-        this.logger.error(`Failed to send to SSE client: ${error}`)
+        this.logger.error(`Failed to send to SSE client: ${error}`);
       }
     }
   }
 
   public getAll(): TranscriptEntry[] {
-    return this.transcripts
+    return this.transcripts;
   }
 
   public addSSEClient(client: SSEClient): void {
-    this.sseClients.add(client)
-    this.logger.info(`SSE client connected. Total clients: ${this.sseClients.size}`)
+    this.sseClients.add(client);
+    this.logger.info(
+      `SSE client connected. Total clients: ${this.sseClients.size}`,
+    );
   }
 
   public removeSSEClient(client: SSEClient): void {
-    const hadClient = this.sseClients.has(client)
-    const sizeBefore = this.sseClients.size
-    this.sseClients.delete(client)
+    const hadClient = this.sseClients.has(client);
+    const sizeBefore = this.sseClients.size;
+    this.sseClients.delete(client);
     this.logger.info(
       `SSE client disconnected. Had client: ${hadClient}, Before: ${sizeBefore}, After: ${this.sseClients.size}`,
-    )
+    );
   }
 
   /**
    * Broadcast display preview to all connected SSE clients
    * Called by DisplayManager when showing content on glasses
    */
-  public broadcastDisplayPreview(text: string, lines: string[], isFinal: boolean): void {
+  public broadcastDisplayPreview(
+    text: string,
+    lines: string[],
+    isFinal: boolean,
+  ): void {
     const message = {
       type: "display_preview",
       text,
       lines,
       isFinal,
       timestamp: Date.now(),
-    }
+    };
 
     this.logger.debug(
       {
@@ -275,13 +278,15 @@ export class TranscriptsManager {
         lineCount: lines.length,
       },
       `📺 Broadcasting display preview to ${this.sseClients.size} SSE clients`,
-    )
+    );
 
     for (const client of this.sseClients) {
       try {
-        client.send(message)
+        client.send(message);
       } catch (error) {
-        this.logger.error(`Failed to send display preview to SSE client: ${error}`)
+        this.logger.error(
+          `Failed to send display preview to SSE client: ${error}`,
+        );
       }
     }
   }
@@ -294,21 +299,25 @@ export class TranscriptsManager {
     const message = {
       type: "settings_update",
       settings,
-    }
+    };
 
-    this.logger.info(`Broadcasting settings update to ${this.sseClients.size} clients`)
+    this.logger.info(
+      `Broadcasting settings update to ${this.sseClients.size} clients`,
+    );
 
     for (const client of this.sseClients) {
       try {
-        client.send(message)
+        client.send(message);
       } catch (error) {
-        this.logger.error(`Failed to send settings update to SSE client: ${error}`)
+        this.logger.error(
+          `Failed to send settings update to SSE client: ${error}`,
+        );
       }
     }
   }
 
   dispose() {
     // No subscription to clean up - UserSession owns it
-    this.sseClients.clear()
+    this.sseClients.clear();
   }
 }

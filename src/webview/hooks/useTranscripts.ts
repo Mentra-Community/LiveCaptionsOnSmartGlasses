@@ -6,7 +6,7 @@ export interface Transcript {
   utteranceId: string | null;
   speaker: string;
   text: string;
-  timestamp: string | null;
+  timestamp: number | null; // Unix epoch ms — formatted client-side in user's timezone
   isFinal: boolean;
 }
 
