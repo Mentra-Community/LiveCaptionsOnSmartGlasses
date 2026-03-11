@@ -71,6 +71,10 @@ export function useTranscripts(frontendToken: string | null = null) {
     return Math.min(delay, MAX_RETRY_DELAY_MS);
   }, []);
 
+  // Ref so scheduleReconnect can call the latest connect without being
+  // in its own dep array (avoids infinite memo loop).
+  const connectRef = useRef<(attempt: number) => Promise<void>>(async () => {});
+
   // Schedule a reconnection attempt
   const scheduleReconnect = useCallback(
     (attempt: number) => {
@@ -119,7 +123,8 @@ export function useTranscripts(frontendToken: string | null = null) {
             countdownIntervalRef.current = null;
           }
           setReconnectSecondsRemaining(null);
-          connect(attempt + 1);
+          // Use ref so we always call the latest connect (avoids stale closure)
+          connectRef.current(attempt + 1);
         }
       }, delay);
     },
@@ -129,7 +134,24 @@ export function useTranscripts(frontendToken: string | null = null) {
   // Main connection function
   const connect = useCallback(
     async (attempt: number = 0) => {
-      if (!mountedRef.current || isConnectingRef.current) return;
+      if (!mountedRef.current) return;
+
+      // If we have no token yet, don't even try — wait for auth to complete.
+      // The useEffect below re-runs when frontendToken changes, which will
+      // call connect(0) again with the real token.
+      if (!frontendToken) {
+        setError("Waiting for authentication...");
+        return;
+      }
+
+      // If already connecting, bail. But: if this call came from the useEffect
+      // (i.e. attempt === 0 and we just got a new token), reset the flag so
+      // an authenticated connect can always proceed.
+      if (isConnectingRef.current && attempt === 0) {
+        isConnectingRef.current = false;
+        cleanup();
+      }
+      if (isConnectingRef.current) return;
 
       isConnectingRef.current = true;
       cleanup();
@@ -148,10 +170,11 @@ export function useTranscripts(frontendToken: string | null = null) {
         }
 
         if (response.status === 401) {
-          console.log("[SSE] Not authenticated");
-          setError("Not authenticated. Waiting for session...");
+          // 401 with a token means the token is genuinely invalid/expired —
+          // don't retry in a loop, just bail and let auth re-initialize.
+          console.log("[SSE] Not authenticated (token rejected)");
+          setError("Authentication failed. Please re-open the app.");
           isConnectingRef.current = false;
-          scheduleReconnect(attempt);
           return;
         }
 
@@ -366,16 +389,27 @@ export function useTranscripts(frontendToken: string | null = null) {
     [cleanup, scheduleReconnect, frontendToken],
   );
 
-  // Initial connection and cleanup
+  // Keep connectRef in sync with the latest connect so scheduleReconnect
+  // never holds a stale closure over frontendToken.
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
+
+  // Initial connection and cleanup.
+  // Runs whenever frontendToken changes (null → real value triggers first connect).
   useEffect(() => {
     mountedRef.current = true;
-    connect(0);
+
+    // Don't attempt until we actually have a token
+    if (frontendToken) {
+      connect(0);
+    }
 
     return () => {
       mountedRef.current = false;
       cleanup();
     };
-  }, [connect, cleanup]);
+  }, [connect, cleanup, frontendToken]);
 
   // Manual reconnect function (for UI button)
   const reconnect = useCallback(() => {

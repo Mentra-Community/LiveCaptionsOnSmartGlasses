@@ -7,13 +7,13 @@
     "dev": "bun --watch src/index.ts",
     "dev:docker": "docker build -f docker/Dockerfile -t live-captions-test . && docker run --rm -it -p 3000:3000 -e NODE_ENV=development -e HOST=0.0.0.0 live-captions-test bun run start",
     "test": "bun test src/app/utils",
-    "ngrok": "ngrok http 3000 --url https://isaiah-tpa.ngrok.app",
+    "ngrok": "ngrok http 3333 --url https://isaiah-tpa.ngrok.app",
     "build:webview": "bun run build.ts",
     "prebuild": "bun run build:webview",
     "start": "bun run build:webview && NODE_ENV=development bun src/index.ts"
   },
   "dependencies": {
-    "@mentra/sdk": "3.0.0-hono.7",
+    "@mentra/sdk": "3.0.0-hono.8",
     "@mentra/react": "^2.1.2",
     "hono": "^4.11.1",
     "@node-rs/jieba": "^2.0.1",
