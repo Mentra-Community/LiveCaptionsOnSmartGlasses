@@ -1,7 +1,7 @@
 "on":
   push:
     branches:
-      - hono-sdk-refactor:feature/device-profile-detection
+      - feature/device-profile-detection
 name: "[debug] Deploy captions-debug 🚀🧪"
 jobs:
   us-central:
