@@ -6,7 +6,7 @@
       "name": "@mentra/captions",
       "dependencies": {
         "@mentra/react": "^2.1.2",
-        "@mentra/sdk": "3.0.0-hono.7",
+        "@mentra/sdk": "3.0.0-hono.8",
         "@node-rs/jieba": "^2.0.1",
         "@radix-ui/react-label": "^2.1.7",
         "@radix-ui/react-select": "^2.2.6",
@@ -114,7 +114,7 @@
 
     "@mentra/react": ["@mentra/react@2.1.2", "", { "peerDependencies": { "react": ">=19.0.0", "react-dom": ">=19.0.0" } }, "sha512-HnZ8bIE4I4L26BnuJ4AZdB48c14X+0PGV/sJJz6VYBXwc9kkoRFh2A2SsOW3PPcj9GMv5O6A/iydPNKF+Wanfg=="],
 
-    "@mentra/sdk": ["@mentra/sdk@3.0.0-hono.7", "", { "dependencies": { "@logtail/pino": "^0.5.4", "@mentra/types": "^1.0.0-beta.1", "axios": "^1.8.1", "chalk": "^5.6.2", "dotenv": "^16.4.0", "hono": "^4.11.3", "jimp": "^1.6.0", "jsonwebtoken": "^8.5.1", "jsrsasign": "^11.1.0", "lamejs": "^1.2.1", "pino": "^9.6.0", "strip-ansi": "^7.1.2", "ws": "^8.18.2" }, "optionalDependencies": { "pino-pretty": "^13.0.0" } }, "sha512-cTD/2YYicS7kEdXelCaM0C6Z8vWkIYCboSRepXqyDZRfOvLVHdTytHAFoGZACUMBudPUYA+9sYNwlXADjgsUhA=="],
+    "@mentra/sdk": ["@mentra/sdk@3.0.0-hono.8", "", { "dependencies": { "@logtail/pino": "^0.5.4", "@mentra/types": "^1.0.0-beta.1", "axios": "^1.8.1", "chalk": "^5.6.2", "dotenv": "^16.4.0", "hono": "^4.11.3", "jimp": "^1.6.0", "jsonwebtoken": "^8.5.1", "jsrsasign": "^11.1.0", "lamejs": "^1.2.1", "pino": "^9.6.0", "strip-ansi": "^7.1.2", "ws": "^8.18.2" }, "optionalDependencies": { "pino-pretty": "^13.0.0" } }, "sha512-0bcdAyEuR7ou7ugNCgDPEOXww6xazRP88oZJ+/GCEp4Aj/DQJ4CSTV9FPoPqs8aneSs0E97Bygkz8oZZFSLgFg=="],
 
     "@mentra/types": ["@mentra/types@1.0.0-beta.2", "", {}, "sha512-yn0H7oYId8TSOGlSDmstds4nnmZbXyDncFy3FC1h4dWpDx6o4BmBehAJd2Otp9gr1bWwIL0yEp6JK60I8TBUGw=="],
 
