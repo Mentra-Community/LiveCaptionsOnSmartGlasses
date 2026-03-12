@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useMentraAuth } from "@mentra/react";
 
 import { BottomNav } from "./components/BottomNav";
 import { Header } from "./components/Header";
@@ -10,6 +11,7 @@ import { useTranscripts } from "./hooks/useTranscripts";
 import "./index.css";
 
 export function App() {
+  const { frontendToken } = useMentraAuth();
   const [activeTab, setActiveTab] = useState<"captions" | "settings">(
     "captions",
   );
@@ -22,7 +24,7 @@ export function App() {
     updateDisplayLines,
     updateDisplayWidth,
     updateWordBreaking,
-  } = useSettings();
+  } = useSettings(frontendToken);
   const {
     transcripts,
     connected,
@@ -32,7 +34,7 @@ export function App() {
     clearTranscripts,
     reconnect,
     displayPreview,
-  } = useTranscripts();
+  } = useTranscripts(frontendToken);
 
   const handleSaveLanguage = async (language: string, hints: string[]) => {
     await updateLanguage(language);

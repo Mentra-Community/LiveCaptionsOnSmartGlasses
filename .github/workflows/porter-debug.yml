@@ -1,7 +1,7 @@
 "on":
   push:
     branches:
-      - feature/live-captions-improvements
+      - feature/device-profile-detection
 name: "[debug] Deploy captions-debug 🚀🧪"
 jobs:
   us-central:

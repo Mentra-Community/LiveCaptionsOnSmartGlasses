@@ -8,21 +8,25 @@
  * Speaker label formatting and history management belong here, not in the SDK.
  */
 
-// Runtime import from SDK subpath
-// Types are resolved via tsconfig paths to the SDK's bundled declarations
+// All profiles and utilities from the SDK's bundled display-utils.
+// @mentra/sdk/display-utils bundles cloud/packages/display-utils which includes
+// G1, G1_LEGACY, Z100, NEX, and G2 profiles — no local copy needed.
 import {
   TextMeasurer,
   TextWrapper,
   DisplayHelpers,
   G1_PROFILE,
   G1_PROFILE_LEGACY,
+  Z100_PROFILE,
+  NEX_PROFILE,
   type DisplayProfile,
   type WrapOptions,
   type WrapResult,
 } from "@mentra/sdk/display-utils";
 
 // Re-export profiles for convenience
-export { G1_PROFILE, G1_PROFILE_LEGACY };
+export { G1_PROFILE, G1_PROFILE_LEGACY, Z100_PROFILE, NEX_PROFILE };
+export type { DisplayProfile };
 
 /**
  * Entry in the transcript history that preserves speaker information.
@@ -39,7 +43,14 @@ export interface TranscriptHistoryEntry {
 export interface CaptionsFormatterOptions {
   /** Maximum number of final transcripts to keep in history */
   maxFinalTranscripts?: number;
-  /** Break mode for text wrapping */
+  /**
+   * Break mode for text wrapping:
+   * - 'character': Break mid-word with hyphen
+   * - 'word': Break at word boundaries, hyphenate only if word > line width
+   * - 'strict-word': Break at word boundaries only, no hyphenation
+   *
+   * Note: 'character-no-hyphen' is not yet in SDK, so we use 'character' as fallback
+   */
   breakMode?: "character" | "word" | "strict-word";
   /** Whether to use character-level breaking for 100% utilization */
   useCharacterBreaking?: boolean;
@@ -114,6 +125,8 @@ export class CaptionsFormatter {
     this.maxLines = options.maxLines ?? profile.maxLines;
 
     // Determine break mode
+    // Default to character breaking for 100% line utilization
+    // Note: Once SDK supports 'character-no-hyphen', we should switch to that
     const breakMode =
       options.breakMode ??
       (options.useCharacterBreaking !== false ? "character" : "word");

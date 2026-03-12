@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createAuthFetch } from "../lib/authFetch";
 
 export interface CaptionSettings {
   language: string;
@@ -8,18 +9,19 @@ export interface CaptionSettings {
   wordBreaking: boolean;
 }
 
-export function useSettings() {
+export function useSettings(frontendToken: string | null = null) {
   const [settings, setSettings] = useState<CaptionSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef(true);
 
   const fetchSettings = useCallback(async () => {
+    const authFetch = createAuthFetch(frontendToken);
     try {
       setLoading(true);
       setError(null);
 
-      const response = await fetch("/api/settings");
+      const response = await authFetch("/api/settings");
 
       if (!mountedRef.current) return;
 
@@ -55,7 +57,7 @@ export function useSettings() {
         setLoading(false);
       }
     }
-  }, []);
+  }, [frontendToken]);
 
   // Initial fetch
   useEffect(() => {
@@ -110,8 +112,9 @@ export function useSettings() {
 
   const updateLanguage = useCallback(
     async (language: string): Promise<boolean> => {
+      const authFetch = createAuthFetch(frontendToken);
       try {
-        const response = await fetch("/api/settings/language", {
+        const response = await authFetch("/api/settings/language", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ language }),
@@ -134,36 +137,41 @@ export function useSettings() {
         return false;
       }
     },
-    [],
+    [frontendToken],
   );
 
-  const updateHints = useCallback(async (hints: string[]): Promise<boolean> => {
-    try {
-      const response = await fetch("/api/settings/language-hints", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hints }),
-      });
+  const updateHints = useCallback(
+    async (hints: string[]): Promise<boolean> => {
+      const authFetch = createAuthFetch(frontendToken);
+      try {
+        const response = await authFetch("/api/settings/language-hints", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hints }),
+        });
 
-      if (response.ok) {
-        setSettings((prev) =>
-          prev ? { ...prev, languageHints: hints } : null,
-        );
-        return true;
+        if (response.ok) {
+          setSettings((prev) =>
+            prev ? { ...prev, languageHints: hints } : null,
+          );
+          return true;
+        }
+
+        console.error("[useSettings] Failed to update hints:", response.status);
+        return false;
+      } catch (err) {
+        console.error("[useSettings] Failed to update hints:", err);
+        return false;
       }
-
-      console.error("[useSettings] Failed to update hints:", response.status);
-      return false;
-    } catch (err) {
-      console.error("[useSettings] Failed to update hints:", err);
-      return false;
-    }
-  }, []);
+    },
+    [frontendToken],
+  );
 
   const updateDisplayLines = useCallback(
     async (lines: number): Promise<boolean> => {
+      const authFetch = createAuthFetch(frontendToken);
       try {
-        const response = await fetch("/api/settings/display-lines", {
+        const response = await authFetch("/api/settings/display-lines", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ lines }),
@@ -186,13 +194,14 @@ export function useSettings() {
         return false;
       }
     },
-    [],
+    [frontendToken],
   );
 
   const updateDisplayWidth = useCallback(
     async (width: number): Promise<boolean> => {
+      const authFetch = createAuthFetch(frontendToken);
       try {
-        const response = await fetch("/api/settings/display-width", {
+        const response = await authFetch("/api/settings/display-width", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ width }),
@@ -215,13 +224,14 @@ export function useSettings() {
         return false;
       }
     },
-    [],
+    [frontendToken],
   );
 
   const updateWordBreaking = useCallback(
     async (enabled: boolean): Promise<boolean> => {
+      const authFetch = createAuthFetch(frontendToken);
       try {
-        const response = await fetch("/api/settings/word-breaking", {
+        const response = await authFetch("/api/settings/word-breaking", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ enabled }),
@@ -244,7 +254,7 @@ export function useSettings() {
         return false;
       }
     },
-    [],
+    [frontendToken],
   );
 
   return {
