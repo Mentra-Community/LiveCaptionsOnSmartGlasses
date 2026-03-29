@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useReducer, useEffect, useRef, useCallback } from "react";
 import { createAuthFetch } from "../lib/authFetch";
 
 export interface Transcript {
@@ -24,26 +24,199 @@ const MAX_RECONNECT_ATTEMPTS = 20;
 const HEARTBEAT_TIMEOUT_MS = 45000; // Consider connection dead if no data for 45s
 const HEARTBEAT_CHECK_INTERVAL_MS = 10000;
 
-export function useTranscripts(frontendToken: string | null = null) {
-  const [transcripts, setTranscripts] = useState<Transcript[]>([]);
-  const [connected, setConnected] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [reconnectAttempt, setReconnectAttempt] = useState(0);
-  const [reconnectSecondsRemaining, setReconnectSecondsRemaining] = useState<
-    number | null
-  >(null);
-  const [displayPreview, setDisplayPreview] = useState<DisplayPreview | null>(
-    null,
-  );
+// --- State machine types ---
 
-  // Refs for cleanup and state tracking
+type ConnectionState =
+  | { status: "idle" }
+  | { status: "connecting"; attempt: number }
+  | { status: "connected" }
+  | { status: "reconnecting"; attempt: number; secondsRemaining: number }
+  | { status: "disconnected"; error: string };
+
+interface State {
+  connection: ConnectionState;
+  transcripts: Transcript[];
+  displayPreview: DisplayPreview | null;
+  isRecording: boolean;
+}
+
+interface TranscriptEvent {
+  id: string;
+  utteranceId: string | null;
+  speaker: string;
+  text: string;
+  timestamp: number | null;
+  type: "interim" | "final";
+}
+
+type Action =
+  | { type: "CONNECT"; attempt: number }
+  | { type: "CONNECTED" }
+  | { type: "LOAD_TRANSCRIPTS"; transcripts: Transcript[] }
+  | { type: "SSE_TRANSCRIPT"; event: TranscriptEvent }
+  | { type: "SCHEDULE_RECONNECT"; attempt: number; secondsRemaining: number }
+  | { type: "UPDATE_COUNTDOWN"; secondsRemaining: number }
+  | { type: "DISCONNECTED"; error: string }
+  | { type: "SET_DISPLAY_PREVIEW"; preview: DisplayPreview }
+  | { type: "TOGGLE_RECORDING" }
+  | { type: "CLEAR_TRANSCRIPTS" }
+  | { type: "RESET_CONNECTION" };
+
+const initialState: State = {
+  connection: { status: "idle" },
+  transcripts: [],
+  displayPreview: null,
+  isRecording: false,
+};
+
+// --- Transcript update logic ---
+
+function applyTranscriptEvent(
+  transcripts: Transcript[],
+  event: TranscriptEvent,
+): Transcript[] {
+  const newTranscript: Transcript = {
+    id: event.id,
+    utteranceId: event.utteranceId,
+    speaker: event.speaker,
+    text: event.text,
+    timestamp: event.timestamp,
+    isFinal: event.type === "final",
+  };
+
+  // Use utteranceId for correlation if available
+  if (event.utteranceId) {
+    const existingIndex = transcripts.findIndex(
+      (t) => t.utteranceId === event.utteranceId,
+    );
+    if (existingIndex >= 0) {
+      const updated = [...transcripts];
+      updated[existingIndex] = newTranscript;
+      return updated;
+    }
+    return [...transcripts, newTranscript];
+  }
+
+  // Legacy behavior: no utteranceId
+  if (event.type === "interim") {
+    const filtered = transcripts.filter(
+      (t) => !(t.speaker === event.speaker && !t.isFinal),
+    );
+    return [...filtered, newTranscript];
+  }
+
+  // Final, no utteranceId — deduplicate by id
+  const alreadyExists = transcripts.some(
+    (t) => t.isFinal && t.id === event.id,
+  );
+  if (alreadyExists) return transcripts;
+
+  const filtered = transcripts.filter(
+    (t) => !(t.speaker === event.speaker && !t.isFinal),
+  );
+  return [...filtered, newTranscript];
+}
+
+// --- Reducer ---
+
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case "CONNECT":
+      return {
+        ...state,
+        connection: { status: "connecting", attempt: action.attempt },
+      };
+
+    case "CONNECTED":
+      return {
+        ...state,
+        connection: { status: "connected" },
+      };
+
+    case "LOAD_TRANSCRIPTS":
+      return {
+        ...state,
+        transcripts: action.transcripts,
+      };
+
+    case "SSE_TRANSCRIPT":
+      return {
+        ...state,
+        transcripts: applyTranscriptEvent(state.transcripts, action.event),
+      };
+
+    case "SCHEDULE_RECONNECT":
+      return {
+        ...state,
+        connection: {
+          status: "reconnecting",
+          attempt: action.attempt,
+          secondsRemaining: action.secondsRemaining,
+        },
+      };
+
+    case "UPDATE_COUNTDOWN":
+      if (state.connection.status !== "reconnecting") return state;
+      return {
+        ...state,
+        connection: {
+          ...state.connection,
+          secondsRemaining: action.secondsRemaining,
+        },
+      };
+
+    case "DISCONNECTED":
+      return {
+        ...state,
+        connection: { status: "disconnected", error: action.error },
+      };
+
+    case "SET_DISPLAY_PREVIEW":
+      return {
+        ...state,
+        displayPreview: action.preview,
+      };
+
+    case "TOGGLE_RECORDING":
+      return {
+        ...state,
+        isRecording: !state.isRecording,
+      };
+
+    case "CLEAR_TRANSCRIPTS":
+      return {
+        ...state,
+        transcripts: [],
+      };
+
+    case "RESET_CONNECTION":
+      return {
+        ...state,
+        connection: { status: "idle" },
+      };
+
+    default:
+      return state;
+  }
+}
+
+// --- Hook ---
+
+export function useTranscripts(frontendToken: string | null = null) {
+  const [state, dispatch] = useReducer(reducer, initialState);
+
+  // Refs for imperative handles (not UI state)
   const eventSourceRef = useRef<EventSource | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const heartbeatCheckRef = useRef<NodeJS.Timeout | null>(null);
   const lastActivityRef = useRef<number>(Date.now());
   const isConnectingRef = useRef(false);
-  const mountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Ref so scheduleReconnect can call the latest connect without being
+  // in its own dep array (avoids infinite memo loop).
+  const connectRef = useRef<(attempt: number) => Promise<void>>(async () => {});
 
   // Cleanup function
   const cleanup = useCallback(() => {
@@ -71,18 +244,16 @@ export function useTranscripts(frontendToken: string | null = null) {
     return Math.min(delay, MAX_RETRY_DELAY_MS);
   }, []);
 
-  // Ref so scheduleReconnect can call the latest connect without being
-  // in its own dep array (avoids infinite memo loop).
-  const connectRef = useRef<(attempt: number) => Promise<void>>(async () => {});
-
   // Schedule a reconnection attempt
   const scheduleReconnect = useCallback(
     (attempt: number) => {
-      if (!mountedRef.current) return;
+      if (abortControllerRef.current?.signal.aborted) return;
 
       if (attempt >= MAX_RECONNECT_ATTEMPTS) {
-        setError("Connection lost. Please refresh the page to reconnect.");
-        setConnected(false);
+        dispatch({
+          type: "DISCONNECTED",
+          error: "Connection lost. Please refresh the page to reconnect.",
+        });
         return;
       }
 
@@ -92,9 +263,11 @@ export function useTranscripts(frontendToken: string | null = null) {
       );
 
       const secondsRemaining = Math.round(delay / 1000);
-      setReconnectSecondsRemaining(secondsRemaining);
-      setError(`Connection lost. Reconnecting in ${secondsRemaining}s...`);
-      setReconnectAttempt(attempt);
+      dispatch({
+        type: "SCHEDULE_RECONNECT",
+        attempt,
+        secondsRemaining,
+      });
 
       // Clear any existing countdown interval
       if (countdownIntervalRef.current) {
@@ -106,8 +279,7 @@ export function useTranscripts(frontendToken: string | null = null) {
       countdownIntervalRef.current = setInterval(() => {
         const elapsed = Date.now() - startTime;
         const remaining = Math.max(0, Math.round((delay - elapsed) / 1000));
-        setReconnectSecondsRemaining(remaining);
-        setError(`Connection lost. Reconnecting in ${remaining}s...`);
+        dispatch({ type: "UPDATE_COUNTDOWN", secondsRemaining: remaining });
 
         if (remaining <= 0 && countdownIntervalRef.current) {
           clearInterval(countdownIntervalRef.current);
@@ -116,13 +288,12 @@ export function useTranscripts(frontendToken: string | null = null) {
       }, 1000);
 
       reconnectTimeoutRef.current = setTimeout(() => {
-        if (mountedRef.current) {
+        if (!abortControllerRef.current?.signal.aborted) {
           // Clear countdown when actually reconnecting
           if (countdownIntervalRef.current) {
             clearInterval(countdownIntervalRef.current);
             countdownIntervalRef.current = null;
           }
-          setReconnectSecondsRemaining(null);
           // Use ref so we always call the latest connect (avoids stale closure)
           connectRef.current(attempt + 1);
         }
@@ -134,13 +305,17 @@ export function useTranscripts(frontendToken: string | null = null) {
   // Main connection function
   const connect = useCallback(
     async (attempt: number = 0) => {
-      if (!mountedRef.current) return;
+      const signal = abortControllerRef.current?.signal;
+      if (signal?.aborted) return;
 
       // If we have no token yet, don't even try — wait for auth to complete.
       // The useEffect below re-runs when frontendToken changes, which will
       // call connect(0) again with the real token.
       if (!frontendToken) {
-        setError("Waiting for authentication...");
+        dispatch({
+          type: "DISCONNECTED",
+          error: "Waiting for authentication...",
+        });
         return;
       }
 
@@ -155,6 +330,7 @@ export function useTranscripts(frontendToken: string | null = null) {
 
       isConnectingRef.current = true;
       cleanup();
+      dispatch({ type: "CONNECT", attempt });
 
       try {
         console.log(`[SSE] Connecting (attempt ${attempt + 1})...`);
@@ -162,9 +338,9 @@ export function useTranscripts(frontendToken: string | null = null) {
         const authFetch = createAuthFetch(frontendToken);
 
         // First, try to load initial transcript history
-        const response = await authFetch("/api/transcripts");
+        const response = await authFetch("/api/transcripts", { signal });
 
-        if (!mountedRef.current) {
+        if (signal?.aborted) {
           isConnectingRef.current = false;
           return;
         }
@@ -173,14 +349,16 @@ export function useTranscripts(frontendToken: string | null = null) {
           // 401 with a token means the token is genuinely invalid/expired —
           // don't retry in a loop, just bail and let auth re-initialize.
           console.log("[SSE] Not authenticated (token rejected)");
-          setError("Authentication failed. Please re-open the app.");
+          dispatch({
+            type: "DISCONNECTED",
+            error: "Authentication failed. Please re-open the app.",
+          });
           isConnectingRef.current = false;
           return;
         }
 
         if (response.status === 404) {
           console.log("[SSE] No active session");
-          setError("No active session. Waiting for connection...");
           isConnectingRef.current = false;
           scheduleReconnect(attempt);
           return;
@@ -188,7 +366,10 @@ export function useTranscripts(frontendToken: string | null = null) {
 
         if (response.ok) {
           const data = await response.json();
-          setTranscripts(data.transcripts || []);
+          dispatch({
+            type: "LOAD_TRANSCRIPTS",
+            transcripts: data.transcripts || [],
+          });
         }
 
         // Connect to SSE stream.
@@ -204,19 +385,16 @@ export function useTranscripts(frontendToken: string | null = null) {
         lastActivityRef.current = Date.now();
 
         eventSource.onopen = () => {
-          if (!mountedRef.current) return;
+          if (signal?.aborted) return;
 
           console.log("[SSE] Connected successfully");
-          setConnected(true);
-          setError(null);
-          setReconnectAttempt(0);
-          setReconnectSecondsRemaining(null);
+          dispatch({ type: "CONNECTED" });
           lastActivityRef.current = Date.now();
           isConnectingRef.current = false;
         };
 
         eventSource.onmessage = (event) => {
-          if (!mountedRef.current) return;
+          if (signal?.aborted) return;
 
           lastActivityRef.current = Date.now();
 
@@ -245,91 +423,30 @@ export function useTranscripts(frontendToken: string | null = null) {
 
             // Handle display preview update
             if (data.type === "display_preview") {
-              setDisplayPreview({
-                text: data.text,
-                lines: data.lines,
-                isFinal: data.isFinal,
-                timestamp: data.timestamp,
+              dispatch({
+                type: "SET_DISPLAY_PREVIEW",
+                preview: {
+                  text: data.text,
+                  lines: data.lines,
+                  isFinal: data.isFinal,
+                  timestamp: data.timestamp,
+                },
               });
               return;
             }
 
-            // Use utteranceId for correlation if available
-            if (data.utteranceId) {
-              setTranscripts((prev) => {
-                const existingIndex = prev.findIndex(
-                  (t) => t.utteranceId === data.utteranceId,
-                );
-
-                const newTranscript: Transcript = {
-                  id: data.id,
-                  utteranceId: data.utteranceId,
-                  speaker: data.speaker,
-                  text: data.text,
-                  timestamp: data.timestamp,
-                  isFinal: data.type === "final",
-                };
-
-                if (existingIndex >= 0) {
-                  // Update existing transcript (interim->interim or interim->final)
-                  const updated = [...prev];
-                  updated[existingIndex] = newTranscript;
-                  return updated;
-                } else {
-                  // New utterance
-                  return [...prev, newTranscript];
-                }
-              });
-            } else {
-              // Legacy behavior: no utteranceId
-              if (data.type === "interim") {
-                setTranscripts((prev) => {
-                  // Remove any existing INTERIM transcript from the same speaker
-                  const filtered = prev.filter(
-                    (t) => !(t.speaker === data.speaker && !t.isFinal),
-                  );
-
-                  return [
-                    ...filtered,
-                    {
-                      id: data.id,
-                      utteranceId: null,
-                      speaker: data.speaker,
-                      text: data.text,
-                      timestamp: null,
-                      isFinal: false,
-                    },
-                  ];
-                });
-              } else if (data.type === "final") {
-                setTranscripts((prev) => {
-                  // Check if we already have this final transcript by ID
-                  const alreadyExists = prev.some(
-                    (t) => t.isFinal && t.id === data.id,
-                  );
-                  if (alreadyExists) {
-                    return prev;
-                  }
-
-                  // Remove the interim transcript from the same speaker
-                  const filtered = prev.filter(
-                    (t) => !(t.speaker === data.speaker && !t.isFinal),
-                  );
-
-                  return [
-                    ...filtered,
-                    {
-                      id: data.id,
-                      utteranceId: null,
-                      speaker: data.speaker,
-                      text: data.text,
-                      timestamp: data.timestamp,
-                      isFinal: true,
-                    },
-                  ];
-                });
-              }
-            }
+            // Transcript event
+            dispatch({
+              type: "SSE_TRANSCRIPT",
+              event: {
+                id: data.id,
+                utteranceId: data.utteranceId ?? null,
+                speaker: data.speaker,
+                text: data.text,
+                timestamp: data.timestamp,
+                type: data.type,
+              },
+            });
           } catch (e) {
             console.error("[SSE] Failed to parse message:", e);
           }
@@ -338,9 +455,8 @@ export function useTranscripts(frontendToken: string | null = null) {
         eventSource.onerror = (e) => {
           console.error("[SSE] Connection error:", e);
 
-          if (!mountedRef.current) return;
+          if (signal?.aborted) return;
 
-          setConnected(false);
           isConnectingRef.current = false;
 
           // Close the current connection
@@ -355,7 +471,7 @@ export function useTranscripts(frontendToken: string | null = null) {
 
         // Start heartbeat monitoring
         heartbeatCheckRef.current = setInterval(() => {
-          if (!mountedRef.current) return;
+          if (signal?.aborted) return;
 
           const timeSinceLastActivity = Date.now() - lastActivityRef.current;
 
@@ -369,19 +485,17 @@ export function useTranscripts(frontendToken: string | null = null) {
               eventSourceRef.current = null;
             }
 
-            setConnected(false);
             scheduleReconnect(0); // Start fresh with attempt 0
           }
         }, HEARTBEAT_CHECK_INTERVAL_MS);
       } catch (err) {
         console.error("[SSE] Failed to connect:", err);
 
-        if (!mountedRef.current) {
+        if (signal?.aborted) {
           isConnectingRef.current = false;
           return;
         }
 
-        setConnected(false);
         isConnectingRef.current = false;
         scheduleReconnect(attempt);
       }
@@ -398,7 +512,8 @@ export function useTranscripts(frontendToken: string | null = null) {
   // Initial connection and cleanup.
   // Runs whenever frontendToken changes (null → real value triggers first connect).
   useEffect(() => {
-    mountedRef.current = true;
+    const ac = new AbortController();
+    abortControllerRef.current = ac;
 
     // Don't attempt until we actually have a token
     if (frontendToken) {
@@ -406,7 +521,7 @@ export function useTranscripts(frontendToken: string | null = null) {
     }
 
     return () => {
-      mountedRef.current = false;
+      ac.abort();
       cleanup();
     };
   }, [connect, cleanup, frontendToken]);
@@ -415,29 +530,35 @@ export function useTranscripts(frontendToken: string | null = null) {
   const reconnect = useCallback(() => {
     console.log("[SSE] Manual reconnect triggered");
     cleanup();
-    setReconnectAttempt(0);
+    dispatch({ type: "RESET_CONNECTION" });
     connect(0);
   }, [connect, cleanup]);
 
-  const [isRecording, setIsRecording] = useState(false);
+  const toggleRecording = useCallback(() => {
+    dispatch({ type: "TOGGLE_RECORDING" });
+  }, []);
 
-  const toggleRecording = () => {
-    setIsRecording((prev) => !prev);
-  };
-
-  const clearTranscripts = () => {
-    setTranscripts([]);
-  };
+  const clearTranscripts = useCallback(() => {
+    dispatch({ type: "CLEAR_TRANSCRIPTS" });
+  }, []);
 
   return {
-    transcripts,
-    connected,
-    error,
-    reconnectAttempt,
-    isRecording,
+    transcripts: state.transcripts,
+    connected: state.connection.status === "connected",
+    error:
+      state.connection.status === "reconnecting"
+        ? `Connection lost. Reconnecting in ${state.connection.secondsRemaining}s...`
+        : state.connection.status === "disconnected"
+          ? state.connection.error
+          : null,
+    reconnectAttempt:
+      state.connection.status === "reconnecting"
+        ? state.connection.attempt
+        : 0,
+    isRecording: state.isRecording,
     toggleRecording,
     clearTranscripts,
     reconnect,
-    displayPreview,
+    displayPreview: state.displayPreview,
   };
 }
