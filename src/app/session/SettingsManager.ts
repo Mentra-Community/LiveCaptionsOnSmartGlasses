@@ -29,10 +29,6 @@ export class SettingsManager {
     const displayLines = await this.getDisplayLines();
     const displayWidth = await this.getDisplayWidth();
 
-    this.logger.debug(
-      `Settings initialized: language=${language}, lines=${displayLines}, width=${displayWidth}`,
-    );
-
     // Apply settings to processor
     await this.applyToProcessor();
   }
@@ -44,7 +40,6 @@ export class SettingsManager {
 
   async setLanguage(language: string): Promise<void> {
     await this.storage.set("language", language);
-    this.logger.debug(`Language set to: ${language}`);
 
     // Update processor with new language settings
     await this.applyToProcessor();
@@ -65,7 +60,6 @@ export class SettingsManager {
 
   async setLanguageHints(hints: string[]): Promise<void> {
     await this.storage.set("languageHints", JSON.stringify(hints));
-    this.logger.debug(`Language hints set to: ${hints.join(", ")}`);
 
     // Broadcast settings change to all connected SSE clients
     this.broadcastSettingsUpdate();
@@ -83,7 +77,6 @@ export class SettingsManager {
       throw new Error("Lines must be between 2 and 5");
     }
     await this.storage.set("displayLines", lines.toString());
-    this.logger.debug(`Display lines set to: ${lines}`);
 
     // Update processor with new settings
     await this.applyToProcessor();
@@ -108,7 +101,6 @@ export class SettingsManager {
       throw new Error("Width must be 0 (Narrow), 1 (Medium), or 2 (Wide)");
     }
     await this.storage.set("displayWidth", width.toString());
-    this.logger.debug(`Display width set to: ${width}`);
 
     // Update processor with new settings
     await this.applyToProcessor();
@@ -126,7 +118,6 @@ export class SettingsManager {
 
   async setWordBreaking(enabled: boolean): Promise<void> {
     await this.storage.set("wordBreaking", enabled.toString());
-    this.logger.debug(`Word breaking set to: ${enabled}`);
 
     // Update processor with new settings
     await this.applyToProcessor();
@@ -169,10 +160,6 @@ export class SettingsManager {
 
     // Pass raw width enum (0=Narrow 50%, 1=Medium 75%, 2=Wide 100%) to DisplayManager
     // DisplayManager handles the percentage conversion internally
-
-    this.logger.debug(
-      `Applying settings to processor: language=${language}, lines=${displayLines}, displayWidth=${displayWidth}, wordBreaking=${wordBreaking}`,
-    );
 
     // Update DisplayManager with raw enum value and word breaking setting
     this.userSession.display.updateSettings(

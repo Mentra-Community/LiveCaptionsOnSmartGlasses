@@ -48,16 +48,6 @@ export class TranscriptsManager {
   public async handleTranscription(
     transcriptData: TranscriptionData,
   ): Promise<void> {
-    this.logger.debug(
-      {
-        isFinal: transcriptData.isFinal,
-        utteranceId: transcriptData.utteranceId,
-        speakerId: transcriptData.speakerId,
-        textLength: transcriptData.text.length,
-      },
-      `Received transcription (final: ${transcriptData.isFinal})`,
-    );
-
     // 1. Create entry and update transcript list
     const entry = this.createEntry(transcriptData);
 

@@ -181,10 +181,6 @@ export class DisplayManager {
     this.currentDisplayWidthPx = this.currentProfile.displayWidthPx;
     this.currentMaxLines = this.currentProfile.maxLines;
 
-    this.logger.debug(
-      `Initializing DisplayManager with profile: ${this.currentProfile.id} (model: ${initialModel || "unknown"})`,
-    );
-
     // Initialize formatter with detected profile
     // Using character-no-hyphen mode for clean word breaks without hyphens
     this.formatter = new CaptionsFormatter(this.currentProfile, {
@@ -209,9 +205,6 @@ export class DisplayManager {
         const newProfile = getProfileForModel(modelName);
 
         if (newProfile.id !== this.currentProfile.id) {
-          this.logger.debug(
-            `Device model changed: ${modelName} -> switching to profile ${newProfile.id}`,
-          );
           this.updateProfile(newProfile);
         }
       },
@@ -239,10 +232,6 @@ export class DisplayManager {
       newProfile,
     );
     this.currentMaxLines = Math.min(this.currentMaxLines, newProfile.maxLines);
-
-    this.logger.debug(
-      `Profile updated to ${newProfile.id}: displayWidth=${this.currentDisplayWidthPx}px, maxLines=${this.currentMaxLines}`,
-    );
 
     // Recreate formatter with new profile
     this.formatter = new CaptionsFormatter(newProfile, {
@@ -317,10 +306,6 @@ export class DisplayManager {
 
     const widthPercent =
       displayWidth === 0 ? 70 : displayWidth === 1 ? 85 : 100;
-
-    this.logger.debug(
-      `Settings update: profile=${this.currentProfile.id}, displayWidth=${displayWidth} (${widthPercent}% = ${this.currentDisplayWidthPx}px), lines=${this.currentMaxLines}`,
-    );
 
     // Get previous transcript history to preserve it
     const previousHistory = this.formatter.getFinalTranscriptHistory();
