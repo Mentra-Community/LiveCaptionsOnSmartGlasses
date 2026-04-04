@@ -181,20 +181,6 @@ export class DisplayManager {
     this.currentDisplayWidthPx = this.currentProfile.displayWidthPx;
     this.currentMaxLines = this.currentProfile.maxLines;
 
-    this.logger.info(
-      `Initializing DisplayManager with profile: ${this.currentProfile.id} (model: ${initialModel || "unknown"})`,
-    );
-    this.logger.info(
-      `Profile details: displayWidthPx=${this.currentProfile.displayWidthPx}, maxLines=${this.currentProfile.maxLines}, defaultGlyphWidth=${this.currentProfile.fontMetrics.defaultGlyphWidth}`,
-    );
-    // Log a sample measurement to verify glyph widths are correct
-    const testChar = "a";
-    const testCharWidth =
-      this.currentProfile.fontMetrics.glyphWidths.get(testChar);
-    this.logger.info(
-      `Profile glyph check: '${testChar}' width = ${testCharWidth}px (should be 12 for Z100)`,
-    );
-
     // Initialize formatter with detected profile
     // Using character-no-hyphen mode for clean word breaks without hyphens
     this.formatter = new CaptionsFormatter(this.currentProfile, {
@@ -216,26 +202,16 @@ export class DisplayManager {
     this.deviceStateCleanup = subscribeToDeviceModel(
       this.userSession.appSession,
       (modelName: string | null) => {
-        this.logger.info(`🔔 Device model callback received: ${modelName}`);
         const newProfile = getProfileForModel(modelName);
 
         if (newProfile.id !== this.currentProfile.id) {
-          this.logger.info(
-            `Device model changed: ${modelName} -> switching to profile ${newProfile.id}`,
-          );
           this.updateProfile(newProfile);
-        } else {
-          this.logger.info(
-            `Device model ${modelName} maps to same profile ${newProfile.id}, no change needed`,
-          );
         }
       },
       this.logger,
     );
 
-    if (this.deviceStateCleanup) {
-      this.logger.info("Subscribed to device model changes");
-    } else {
+    if (!this.deviceStateCleanup) {
       this.logger.warn(
         "Device state subscription not available, using default profile",
       );
@@ -257,10 +233,6 @@ export class DisplayManager {
     );
     this.currentMaxLines = Math.min(this.currentMaxLines, newProfile.maxLines);
 
-    this.logger.info(
-      `Profile updated to ${newProfile.id}: displayWidth=${this.currentDisplayWidthPx}px, maxLines=${this.currentMaxLines}`,
-    );
-
     // Recreate formatter with new profile
     this.formatter = new CaptionsFormatter(newProfile, {
       maxFinalTranscripts: 30,
@@ -278,10 +250,6 @@ export class DisplayManager {
         entry.hadSpeakerChange,
       );
     }
-
-    this.logger.info(
-      `Preserved ${previousHistory.length} transcripts after profile change`,
-    );
 
     // Refresh display with new profile
     this.refreshDisplay();
@@ -339,10 +307,6 @@ export class DisplayManager {
     const widthPercent =
       displayWidth === 0 ? 70 : displayWidth === 1 ? 85 : 100;
 
-    this.logger.info(
-      `Settings update: profile=${this.currentProfile.id}, displayWidth=${displayWidth} (${widthPercent}% = ${this.currentDisplayWidthPx}px), lines=${this.currentMaxLines}, wordBreaking=${this.currentWordBreaking}`,
-    );
-
     // Get previous transcript history to preserve it
     const previousHistory = this.formatter.getFinalTranscriptHistory();
 
@@ -365,10 +329,6 @@ export class DisplayManager {
         entry.hadSpeakerChange,
       );
     }
-
-    this.logger.info(
-      `Preserved ${previousHistory.length} transcripts after settings change`,
-    );
 
     // Immediately refresh the display with new settings
     this.refreshDisplay();
@@ -398,10 +358,6 @@ export class DisplayManager {
     if (result.displayText.trim()) {
       const cleaned = this.cleanTranscriptText(result.displayText);
       const lines = cleaned.split("\n");
-
-      this.logger.info(
-        `Refreshing display with new settings: ${lines.length} lines`,
-      );
 
       // Send to glasses
       try {
@@ -437,17 +393,8 @@ export class DisplayManager {
       speakerId !== undefined && speakerId !== this.lastSpeakerId;
 
     if (speakerChanged) {
-      this.logger.info(
-        `Speaker changed: ${this.lastSpeakerId || "none"} -> ${speakerId}`,
-      );
       this.lastSpeakerId = speakerId;
     }
-
-    this.logger.info(
-      `Processing transcript: "${text.substring(0, 50)}..." (final: ${isFinal}, speaker: ${
-        speakerId || "unknown"
-      }, changed: ${speakerChanged})`,
-    );
 
     // Process using the new formatter
     const result = this.formatter.processTranscription(
@@ -457,9 +404,6 @@ export class DisplayManager {
       speakerChanged,
     );
 
-    this.logger.info(
-      `Formatted for display: "${result.displayText.substring(0, 100)}..."`,
-    );
     this.showOnGlasses(result.displayText, isFinal);
     this.resetInactivityTimer();
   }
@@ -467,12 +411,6 @@ export class DisplayManager {
   private showOnGlasses(text: string, isFinal: boolean): void {
     const cleaned = this.cleanTranscriptText(text);
     const lines = cleaned.split("\n");
-
-    this.logger.info(
-      `Showing on glasses: "${cleaned.substring(0, 100)}..." (final: ${isFinal}, duration: ${
-        isFinal ? "20s" : "indefinite"
-      })`,
-    );
 
     // Send to glasses
     try {
@@ -524,10 +462,6 @@ export class DisplayManager {
 
     // Clear transcript processor history after 40 seconds of inactivity
     this.inactivityTimer = setTimeout(() => {
-      this.logger.info(
-        "Clearing transcript formatter history due to inactivity",
-      );
-
       this.formatter.clear();
       this.lastSpeakerId = undefined; // Reset speaker tracking
 
