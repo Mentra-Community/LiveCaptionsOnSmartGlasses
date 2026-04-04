@@ -2,41 +2,42 @@
 
 ## Goal
 
-Reduce captions app log volume. Currently producing ~4 million lines per 2 hours. The main offenders are info-level logs that fire on every transcription event, every display update, and every settings change.
+Reduce captions app log volume. Previously producing ~4 million lines per 2 hours. The main offenders were info-level logs that fired on every transcription event, every display update, and every settings change.
 
-## What to change
+## What was changed
 
-### Downgrade to debug
+### Removed entirely
 
 **In `src/app/session/DisplayManager.ts`:**
 
-- `processAndDisplay` logs the transcription text at info on every single transcript event. This is the highest-volume log in the app. Downgrade to debug.
-- `showOnGlasses` logs the display text at info every time something is sent to glasses. Downgrade to debug.
-- `refreshDisplay` logs at info on every settings-triggered refresh. Downgrade to debug.
-- `resetInactivityTimer` logs "Clearing transcript formatter history" at info. Downgrade to debug.
+- `processAndDisplay` logged the transcription text at info on every single transcript event. Removed entirely.
+- `showOnGlasses` logged the display text at info every time something was sent to glasses. Removed entirely.
+- `refreshDisplay` logged at info on every settings-triggered refresh. Removed entirely.
+- `resetInactivityTimer` logged "Clearing transcript formatter history" at info. Removed entirely.
+- Device model subscription callbacks logged at info on every callback. Removed entirely.
+- Profile update and settings update logs. Removed entirely.
+- Kept: warn/error on connection failures (showOnGlasses, refreshDisplay catch blocks).
 
 **In `src/app/session/SettingsManager.ts`:**
 
-- `initialize` logs all settings values at info. Fine at debug.
-- `setLanguage`, `setLanguageHints`, `setDisplayLines`, `setDisplayWidth` all log at info on every change. Downgrade to debug.
-- `applyToProcessor` logs all settings being applied at info. Downgrade to debug.
+- `initialize` logged all settings values at info. Removed entirely.
+- `setLanguage`, `setLanguageHints`, `setDisplayLines`, `setDisplayWidth`, `setWordBreaking` all logged at info on every change. Removed entirely.
+- `applyToProcessor` logged all settings being applied at info. Removed entirely.
+- Kept: error on broadcast failure.
 
 **In `src/app/session/TranscriptsManager.ts`:**
 
-- `handleTranscription` logs the full transcription text, utteranceId, speakerId at info on every transcript event. This should not be logged in production at all, or at most at debug level without the transcript text.
+- `handleTranscription` logged the full transcription text, utteranceId, speakerId at info on every transcript event. Removed entirely. This fired multiple times per second per user and contained sensitive user speech content.
 
-### Remove sensitive data from logs
+### Sensitive data removed from logs
 
-- `handleTranscription` includes `text: transcriptData.text` in the log object. This is user speech content and should not be persisted in logs. Remove the text field from the log, or replace with a length indicator like `textLength: transcriptData.text.length`.
-- `processAndDisplay` logs `"Processing transcript: \"${text.substring(0, 50)}...\""`. Same issue. Remove the text content.
-- `showOnGlasses` logs `"Showing on glasses: \"${cleaned.substring(0, 100)}...\""`. Remove the text content.
+- Transcript text content was present in multiple log messages across DisplayManager and TranscriptsManager. All instances removed.
 
-### Keep at info
+### What was kept
 
-- Session start and session stop
-- Errors
-- Settings changes that affect user experience (keep one log per change, not multiple)
+- Session start and session stop logs
+- Errors and warnings (connection failures, broadcast failures)
 
-## What NOT to change
+## What was NOT changed
 
-- Do not refactor the transcription pipeline or display logic. Just change log levels and remove sensitive content from log messages.
+- No application logic was modified. Only log lines were removed.
