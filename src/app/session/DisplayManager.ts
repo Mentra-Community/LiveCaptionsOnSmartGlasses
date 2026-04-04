@@ -1,12 +1,153 @@
-import { ViewType } from "@mentra/sdk";
+import {
+  ViewType,
+  type AppSession,
+  type DeviceState,
+  type Observable,
+} from "@mentra/sdk";
 
 import {
   CaptionsFormatter,
-  G1_PROFILE_LEGACY,
   G1_PROFILE,
+  Z100_PROFILE,
+  NEX_PROFILE,
+  type DisplayProfile,
   type TranscriptHistoryEntry,
 } from "../utils/CaptionsFormatter";
 import { UserSession } from "./UserSession";
+
+// Type for the device object on AppSession
+interface DeviceWithState {
+  state: DeviceState;
+}
+
+/**
+ * Map device model names to display profiles
+ */
+function getProfileForModel(
+  modelName: string | null | undefined,
+): DisplayProfile {
+  if (!modelName) return G1_PROFILE; // Default to G1
+
+  const lower = modelName.toLowerCase();
+
+  // Even Realities G1
+  if (
+    lower.includes("g1") ||
+    lower.includes("even realities") ||
+    lower.includes("even_g1")
+  ) {
+    return G1_PROFILE;
+  }
+
+  // Vuzix Z100 and Mentra Mach1 (same hardware)
+  if (
+    lower.includes("z100") ||
+    lower.includes("vuzix") ||
+    lower.includes("mach1") ||
+    lower.includes("mach 1")
+  ) {
+    return Z100_PROFILE;
+  }
+
+  // Mentra Nex / Mentra Display
+  if (
+    lower.includes("nex") ||
+    lower.includes("mentra display") ||
+    lower.includes("mentra_nex")
+  ) {
+    return NEX_PROFILE;
+  }
+
+  // Default to G1 for unknown devices
+  return G1_PROFILE;
+}
+
+/**
+ * Safely get the device model name from AppSession
+ * Uses SDK's device.state.modelName Observable API
+ */
+function getDeviceModelName(
+  appSession: AppSession,
+  logger?: UserSession["logger"],
+): string | null {
+  try {
+    // Access device.state from AppSession (SDK provides this)
+    const device = appSession.device as DeviceWithState | undefined;
+    const deviceState = device?.state;
+
+    logger?.debug(`[getDeviceModelName] device.state exists: ${!!deviceState}`);
+
+    if (deviceState?.modelName) {
+      // modelName is an Observable<string | null>
+      const modelNameObservable = deviceState.modelName as Observable<
+        string | null
+      >;
+      const modelName = modelNameObservable.value;
+      logger?.debug(
+        `[getDeviceModelName] device.state.modelName.value: ${modelName}`,
+      );
+      if (modelName) {
+        logger?.info(
+          `[getDeviceModelName] Found model via device.state.modelName.value: ${modelName}`,
+        );
+        return modelName;
+      }
+    }
+
+    logger?.warn(`[getDeviceModelName] No model name found in device.state`);
+  } catch (err) {
+    logger?.error(`[getDeviceModelName] Error: ${err}`);
+  }
+  return null;
+}
+
+/**
+ * Subscribe to device model changes using SDK's Observable API
+ * Returns cleanup function or null if subscription not available
+ */
+function subscribeToDeviceModel(
+  appSession: AppSession,
+  callback: (modelName: string | null) => void,
+  logger?: UserSession["logger"],
+): (() => void) | null {
+  try {
+    // Access device.state from AppSession
+    const device = appSession.device as DeviceWithState | undefined;
+    const deviceState = device?.state;
+
+    logger?.debug(
+      `[subscribeToDeviceModel] device.state exists: ${!!deviceState}`,
+    );
+
+    if (deviceState?.modelName) {
+      const modelNameObservable = deviceState.modelName as Observable<
+        string | null
+      >;
+
+      logger?.debug(
+        `[subscribeToDeviceModel] device.state.modelName.onChange exists: ${!!modelNameObservable.onChange}`,
+      );
+
+      if (modelNameObservable.onChange) {
+        logger?.info(
+          `[subscribeToDeviceModel] Using device.state.modelName.onChange`,
+        );
+        // Observable.onChange returns a cleanup function
+        return modelNameObservable.onChange((value: string | null) => {
+          logger?.info(
+            `[subscribeToDeviceModel] 🔔 CALLBACK FIRED! modelName = ${value}`,
+          );
+          callback(value);
+        });
+      }
+    }
+
+    logger?.warn(`[subscribeToDeviceModel] No subscription method available`);
+  } catch (err) {
+    logger?.error(`[subscribeToDeviceModel] Error: ${err}`);
+  }
+  return null;
+}
 
 export class DisplayManager {
   private formatter: CaptionsFormatter;
@@ -15,42 +156,148 @@ export class DisplayManager {
   private readonly logger: UserSession["logger"];
   private lastSpeakerId: string | undefined = undefined; // Track last speaker for change detection
 
+  // Current display profile (detected from connected glasses)
+  private currentProfile: DisplayProfile = G1_PROFILE;
+
   // Current display settings
-  private currentDisplayWidthPx: number = G1_PROFILE_LEGACY.displayWidthPx;
-  private currentMaxLines: number = G1_PROFILE_LEGACY.maxLines;
+  private currentDisplayWidthPx: number = G1_PROFILE.displayWidthPx;
+  private currentMaxLines: number = G1_PROFILE.maxLines;
   private currentWordBreaking: boolean = true;
+  private currentWidthSetting: number = 2; // 0=Narrow, 1=Medium, 2=Wide (default: Wide)
+
+  // Device state subscription cleanup
+  private deviceStateCleanup: (() => void) | null = null;
 
   constructor(userSession: UserSession) {
     this.userSession = userSession;
     this.logger = userSession.logger.child({ service: "DisplayManager" });
 
-    // Initialize with defaults (will be updated by SettingsManager)
-    // Using character breaking mode for 100% line utilization
-    this.formatter = new CaptionsFormatter(G1_PROFILE_LEGACY, {
+    // Detect initial device model
+    const initialModel = getDeviceModelName(
+      userSession.appSession,
+      this.logger,
+    );
+    this.currentProfile = getProfileForModel(initialModel);
+    this.currentDisplayWidthPx = this.currentProfile.displayWidthPx;
+    this.currentMaxLines = this.currentProfile.maxLines;
+
+    this.logger.info(
+      `Initializing DisplayManager with profile: ${this.currentProfile.id} (model: ${initialModel || "unknown"})`,
+    );
+    this.logger.info(
+      `Profile details: displayWidthPx=${this.currentProfile.displayWidthPx}, maxLines=${this.currentProfile.maxLines}, defaultGlyphWidth=${this.currentProfile.fontMetrics.defaultGlyphWidth}`,
+    );
+    // Log a sample measurement to verify glyph widths are correct
+    const testChar = "a";
+    const testCharWidth =
+      this.currentProfile.fontMetrics.glyphWidths.get(testChar);
+    this.logger.info(
+      `Profile glyph check: '${testChar}' width = ${testCharWidth}px (should be 12 for Z100)`,
+    );
+
+    // Initialize formatter with detected profile
+    // Using character-no-hyphen mode for clean word breaks without hyphens
+    this.formatter = new CaptionsFormatter(this.currentProfile, {
       maxFinalTranscripts: 30,
       breakMode: this.currentWordBreaking ? "character" : "word",
       displayWidthPx: this.currentDisplayWidthPx,
       maxLines: this.currentMaxLines,
     });
+
+    // Subscribe to device model changes
+    this.subscribeToDeviceChanges();
   }
 
   /**
-   * Update display settings
-   *
-   * @param displayWidth - Display width setting: 0=Narrow (50%), 1=Medium (75%), 2=Wide (100%)
-   * @param numberOfLines - Maximum number of lines to display (2-5)
-   * @param wordBreaking - Whether to break words with hyphens (true) or only at word boundaries (false)
+   * Subscribe to device state changes to update profile when glasses change
    */
-  updateSettings(
-    displayWidth: number,
-    numberOfLines: number,
-    wordBreaking: boolean = true,
-  ): void {
-    // Convert width setting to pixels as percentage of max display width
-    // 0 = Narrow (50%), 1 = Medium (75%), 2 = Wide (100%)
-    const maxWidthPx = G1_PROFILE_LEGACY.displayWidthPx;
+  private subscribeToDeviceChanges(): void {
+    // Use safe subscription helper that works with both old and new SDK
+    this.deviceStateCleanup = subscribeToDeviceModel(
+      this.userSession.appSession,
+      (modelName: string | null) => {
+        this.logger.info(`🔔 Device model callback received: ${modelName}`);
+        const newProfile = getProfileForModel(modelName);
+
+        if (newProfile.id !== this.currentProfile.id) {
+          this.logger.info(
+            `Device model changed: ${modelName} -> switching to profile ${newProfile.id}`,
+          );
+          this.updateProfile(newProfile);
+        } else {
+          this.logger.info(
+            `Device model ${modelName} maps to same profile ${newProfile.id}, no change needed`,
+          );
+        }
+      },
+      this.logger,
+    );
+
+    if (this.deviceStateCleanup) {
+      this.logger.info("Subscribed to device model changes");
+    } else {
+      this.logger.warn(
+        "Device state subscription not available, using default profile",
+      );
+    }
+  }
+
+  /**
+   * Update the display profile (when glasses change)
+   */
+  private updateProfile(newProfile: DisplayProfile): void {
+    const previousHistory = this.formatter.getFinalTranscriptHistory();
+
+    this.currentProfile = newProfile;
+
+    // Recalculate display width based on current width setting and new profile
+    this.currentDisplayWidthPx = this.calculateDisplayWidth(
+      this.currentWidthSetting,
+      newProfile,
+    );
+    this.currentMaxLines = Math.min(this.currentMaxLines, newProfile.maxLines);
+
+    this.logger.info(
+      `Profile updated to ${newProfile.id}: displayWidth=${this.currentDisplayWidthPx}px, maxLines=${this.currentMaxLines}`,
+    );
+
+    // Recreate formatter with new profile
+    this.formatter = new CaptionsFormatter(newProfile, {
+      maxFinalTranscripts: 30,
+      breakMode: this.currentWordBreaking ? "character" : "word",
+      displayWidthPx: this.currentDisplayWidthPx,
+      maxLines: this.currentMaxLines,
+    });
+
+    // Restore transcript history
+    for (const entry of previousHistory) {
+      this.formatter.processTranscription(
+        entry.text,
+        true,
+        entry.speakerId,
+        entry.hadSpeakerChange,
+      );
+    }
+
+    this.logger.info(
+      `Preserved ${previousHistory.length} transcripts after profile change`,
+    );
+
+    // Refresh display with new profile
+    this.refreshDisplay();
+  }
+
+  /**
+   * Calculate display width in pixels based on width setting and profile
+   */
+  private calculateDisplayWidth(
+    widthSetting: number,
+    profile: DisplayProfile,
+  ): number {
+    const maxWidthPx = profile.displayWidthPx;
     let widthPercent: number;
-    switch (displayWidth) {
+
+    switch (widthSetting) {
       case 0: // Narrow
         widthPercent = 0.7;
         break;
@@ -62,14 +309,38 @@ export class DisplayManager {
         widthPercent = 1.0;
         break;
     }
-    this.currentDisplayWidthPx = Math.round(maxWidthPx * widthPercent);
-    this.currentMaxLines = Math.min(Math.max(2, numberOfLines), 5); // Clamp between 2-5
+
+    return Math.round(maxWidthPx * widthPercent);
+  }
+
+  /**
+   * Update display settings
+   *
+   * @param displayWidth - Display width setting: 0=Narrow (70%), 1=Medium (85%), 2=Wide (100%)
+   * @param numberOfLines - Maximum number of lines to display (2-5)
+   * @param wordBreaking - Whether to break words mid-word (true) or only at word boundaries (false)
+   */
+  updateSettings(
+    displayWidth: number,
+    numberOfLines: number,
+    wordBreaking: boolean = true,
+  ): void {
+    this.currentWidthSetting = displayWidth;
+    this.currentDisplayWidthPx = this.calculateDisplayWidth(
+      displayWidth,
+      this.currentProfile,
+    );
+    this.currentMaxLines = Math.min(
+      Math.max(2, numberOfLines),
+      this.currentProfile.maxLines,
+    ); // Clamp between 2 and profile max
     this.currentWordBreaking = wordBreaking;
 
+    const widthPercent =
+      displayWidth === 0 ? 70 : displayWidth === 1 ? 85 : 100;
+
     this.logger.info(
-      `Settings update: displayWidth=${displayWidth} (${widthPercent * 100}% = ${
-        this.currentDisplayWidthPx
-      }px), lines=${this.currentMaxLines}, wordBreaking=${this.currentWordBreaking}`,
+      `Settings update: profile=${this.currentProfile.id}, displayWidth=${displayWidth} (${widthPercent}% = ${this.currentDisplayWidthPx}px), lines=${this.currentMaxLines}, wordBreaking=${this.currentWordBreaking}`,
     );
 
     // Get previous transcript history to preserve it
@@ -77,8 +348,8 @@ export class DisplayManager {
 
     // Create new formatter with updated settings
     // breakMode: 'character' = break mid-word with hyphens for 100% utilization
-    // breakMode: 'word' = break at word boundaries only (no hyphens mid-word)
-    this.formatter = new CaptionsFormatter(G1_PROFILE_LEGACY, {
+    // breakMode: 'word' = break at word boundaries only
+    this.formatter = new CaptionsFormatter(this.currentProfile, {
       maxFinalTranscripts: 30,
       breakMode: this.currentWordBreaking ? "character" : "word",
       displayWidthPx: this.currentDisplayWidthPx,
@@ -282,9 +553,57 @@ export class DisplayManager {
     return this.formatter.getFinalTranscriptHistory();
   }
 
+  /**
+   * Get the current display profile
+   */
+  getCurrentProfile(): DisplayProfile {
+    return this.currentProfile;
+  }
+
+  /**
+   * Get the current display width in pixels
+   */
+  getCurrentDisplayWidthPx(): number {
+    return this.currentDisplayWidthPx;
+  }
+
+  /**
+   * Check if character breaking (mid-word) is enabled
+   * @deprecated Use isCharacterBreakingEnabled() instead
+   */
+  isWordBreakingEnabled(): boolean {
+    return this.currentWordBreaking;
+  }
+
+  /**
+   * Check if character breaking (mid-word, no hyphens) is enabled
+   */
+  isCharacterBreakingEnabled(): boolean {
+    return this.currentWordBreaking;
+  }
+
+  /**
+   * Set character breaking mode
+   * @param enabled - true for character-level breaking, false for word-level only
+   */
+  setCharacterBreaking(enabled: boolean): void {
+    if (this.currentWordBreaking !== enabled) {
+      this.updateSettings(
+        this.currentWidthSetting,
+        this.currentMaxLines,
+        enabled,
+      );
+    }
+  }
+
   dispose(): void {
     if (this.inactivityTimer) {
       clearTimeout(this.inactivityTimer);
+    }
+
+    if (this.deviceStateCleanup) {
+      this.deviceStateCleanup();
+      this.deviceStateCleanup = null;
     }
   }
 }
