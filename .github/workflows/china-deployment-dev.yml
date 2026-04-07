@@ -46,7 +46,7 @@ jobs:
           alibaba-access-key-secret: ${{ secrets.ALIBABA_ACCESS_KEY_SECRET }}
           deployment-region: "cn-shenzhen"
           app-name: "livecaption"
-          acr-instance-id: "cri-h675v46p9lj694l6"
+          acr-instance-id: "cri-jqkk34lm32lg9ce7"
           acr-vpc-domain: "mentra-acr-cnsz-a-registry-vpc.cn-shenzhen.cr.aliyuncs.com"
           acr-public-domain: "mentra-acr-cnsz-a-registry.cn-shenzhen.cr.aliyuncs.com"
           docker-context: "./"
