@@ -28,6 +28,8 @@ jobs:
             value: "china"
           - name: AUGMENTOS_API_KEY
             value: "${{ secrets.CHINA_AUGMENTOS_API_KEY }}"
+          - name: MENTRAOS_API_KEY
+            value: "${{ secrets.CHINA_AUGMENTOS_API_KEY }}"
           EOL
 
       - name: Create container args file
