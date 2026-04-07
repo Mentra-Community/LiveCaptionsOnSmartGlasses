@@ -30,7 +30,7 @@ jobs:
             value: "${{ secrets.CHINA_AUGMENTOS_API_KEY }}"
           - name: MENTRAOS_API_KEY
             value: "${{ secrets.CHINA_AUGMENTOS_API_KEY }}"
-          - name; PORT
+          - name: PORT
             value: "80"
           EOL
 
