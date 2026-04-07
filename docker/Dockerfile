@@ -2,14 +2,20 @@ FROM oven/bun:latest
 
 WORKDIR /app
 
-# Copy package files
+# Copy package files first (for better layer caching)
 COPY package.json bun.lock* ./
 
-# Install dependencies (including dev dependencies for build)
+# Install dependencies
 RUN bun install
 
-# Copy the application code
+# Copy the rest of the application code
 COPY . .
+
+# Build webview for production
+RUN bun run build:webview
+
+# Set production environment
+ENV NODE_ENV=production
 
 # Expose the port
 EXPOSE 80
