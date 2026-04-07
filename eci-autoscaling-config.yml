@@ -31,6 +31,10 @@ spec:
               value: china
             - name: AUGMENTOS_API_KEY
               value: "${AUGMENTOS_API_KEY}"
+            - name: MENTRAOS_API_KEY
+              value: "${MENTRAOS_API_KEY}"
+            - name: PORT
+              value: "${PORT}"
           image: mentra-acr-cnsz-a-registry-vpc.cn-shenzhen.cr.aliyuncs.com/mentra-dev/live_captions:latest
           imagePullPolicy: Always
           lifecycle: {}
