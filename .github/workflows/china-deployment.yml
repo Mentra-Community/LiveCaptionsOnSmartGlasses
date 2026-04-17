@@ -23,7 +23,7 @@ jobs:
         run: |
           cat > env.yaml << 'EOL'
           - name: PACKAGE_NAME
-            value: "com.augmentos.livecaptions"
+            value: "com.mentra.captions"
           - name: DEPLOYMENT_REGION
             value: "china"
           - name: AUGMENTOS_API_KEY
