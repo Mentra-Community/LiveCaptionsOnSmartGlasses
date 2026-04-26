@@ -32,6 +32,12 @@ jobs:
             value: "${{ secrets.CHINA_AUGMENTOS_API_KEY }}"
           - name: PORT
             value: "80"
+          - name: aliyun_logs_app
+            value: "stdout"
+          - name: aliyun_logs_app_project
+            value: "mentraos-prod-sls"
+          - name: aliyun_logs_app_logstore
+            value: "caption"
           EOL
 
       - name: Create container args file
