@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 
-import { TranscriptionData } from "@mentra/sdk";
+import type { TranscriptionEvent } from "@mentra/sdk/session";
 
 import { UserSession } from "./UserSession";
 import { convertToPinyin } from "../utils/ChineseUtils";
@@ -46,7 +46,7 @@ export class TranscriptsManager {
    * This is the single entry point for all transcription processing
    */
   public async handleTranscription(
-    transcriptData: TranscriptionData,
+    transcriptData: TranscriptionEvent,
   ): Promise<void> {
     this.logger.info(
       {
@@ -93,7 +93,7 @@ export class TranscriptsManager {
     );
   }
 
-  private createEntry(data: TranscriptionData): TranscriptEntry {
+  private createEntry(data: TranscriptionEvent): TranscriptEntry {
     // Use utteranceId if available, otherwise generate a random ID
     const id = data.utteranceId || randomUUID();
 

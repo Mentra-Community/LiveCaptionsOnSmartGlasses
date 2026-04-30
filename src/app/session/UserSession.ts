@@ -1,4 +1,4 @@
-import { AppSession, TranscriptionData } from "@mentra/sdk";
+import type { MentraSession } from "@mentra/sdk";
 import { TranscriptsManager } from "./TranscriptsManager";
 import { SettingsManager } from "./SettingsManager";
 import { DisplayManager } from "./DisplayManager";
@@ -10,18 +10,18 @@ export class UserSession {
     UserSession
   >();
   readonly userId: string;
-  readonly appSession: AppSession;
-  readonly logger: AppSession["logger"];
+  readonly session: MentraSession;
+  readonly logger: MentraSession["logger"];
   readonly transcripts: TranscriptsManager;
   readonly settings: SettingsManager;
   readonly display: DisplayManager;
 
   private transcriptionCleanup: (() => void) | null = null;
 
-  constructor(appSession: AppSession) {
-    this.appSession = appSession;
-    this.userId = appSession.userId;
-    this.logger = appSession.logger;
+  constructor(session: MentraSession) {
+    this.session = session;
+    this.userId = session.userId!;
+    this.logger = session.logger;
     this.transcripts = new TranscriptsManager(this);
     this.settings = new SettingsManager(this);
     this.display = new DisplayManager(this);
@@ -29,12 +29,12 @@ export class UserSession {
   }
 
   /**
-   * Initialize the user session with settings and transcription subscription
-   * This should be called after construction to set up the session
+   * Initialize the user session with settings and transcription subscription.
+   * Called after construction to set up the session.
    */
   async initialize(): Promise<void> {
     try {
-      // Initialize settings first (loads from cloud)
+      // Initialize settings first (loads from cloud storage)
       await this.settings.initialize();
 
       // Get language configuration from settings
@@ -43,27 +43,28 @@ export class UserSession {
       const locale = languageToLocale(language);
 
       // Get display settings and update DisplayManager
-      // DisplayManager expects raw enum values: 0=Narrow, 1=Medium, 2=Wide
       const displayWidth = await this.settings.getDisplayWidth();
       const displayLines = await this.settings.getDisplayLines();
       const wordBreaking = await this.settings.getWordBreaking();
       this.display.updateSettings(displayWidth, displayLines, wordBreaking);
 
-      // Subscribe to transcription events with language and hints
-      // If "auto" mode, use "en-US" as fallback for SDK
+      // Configure transcription with language hints
+      if (languageHints.length > 0) {
+        this.session.transcription.configure({
+          languageHints,
+        });
+      }
+
+      // Subscribe to transcription events with language filter
+      // If "auto" mode, use "en-US" as fallback
       const subscriptionLocale = language === "auto" ? "en-US" : locale;
 
-      this.transcriptionCleanup =
-        this.appSession.events.onTranscriptionForLanguage(
-          subscriptionLocale,
-          (data: TranscriptionData) => {
-            // Route all transcriptions through TranscriptsManager
-            this.transcripts.handleTranscription(data);
-          },
-          {
-            hints: languageHints,
-          },
-        );
+      this.transcriptionCleanup = this.session.transcription.forLanguage(
+        subscriptionLocale,
+        (data) => {
+          this.transcripts.handleTranscription(data);
+        },
+      );
 
       this.logger.info(
         {
@@ -82,13 +83,12 @@ export class UserSession {
       );
 
       // Fallback: subscribe with default language (en-US) and no hints
-      this.transcriptionCleanup =
-        this.appSession.events.onTranscriptionForLanguage(
-          "en-US",
-          (data: TranscriptionData) => {
-            this.transcripts.handleTranscription(data);
-          },
-        );
+      this.transcriptionCleanup = this.session.transcription.forLanguage(
+        "en-US",
+        (data) => {
+          this.transcripts.handleTranscription(data);
+        },
+      );
     }
   }
 

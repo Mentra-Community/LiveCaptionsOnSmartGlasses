@@ -13,7 +13,7 @@
     "start": "bun run build:webview && NODE_ENV=development bun src/index.ts"
   },
   "dependencies": {
-    "@mentra/sdk": "3.0.0-hono.8",
+    "@mentra/sdk": "3.0.0-alpha.4",
     "@mentra/react": "^2.1.2",
     "hono": "^4.11.1",
     "@node-rs/jieba": "^2.0.1",

@@ -1,9 +1,4 @@
-import {
-  ViewType,
-  type AppSession,
-  type DeviceState,
-  type Observable,
-} from "@mentra/sdk";
+import type { MentraSession } from "@mentra/sdk";
 
 import {
   CaptionsFormatter,
@@ -14,11 +9,6 @@ import {
   type TranscriptHistoryEntry,
 } from "../utils/CaptionsFormatter";
 import { UserSession } from "./UserSession";
-
-// Type for the device object on AppSession
-interface DeviceWithState {
-  state: DeviceState;
-}
 
 /**
  * Map device model names to display profiles
@@ -63,90 +53,14 @@ function getProfileForModel(
 }
 
 /**
- * Safely get the device model name from AppSession
- * Uses SDK's device.state.modelName Observable API
+ * Get the device model name from MentraSession via device.state.modelName
  */
-function getDeviceModelName(
-  appSession: AppSession,
-  logger?: UserSession["logger"],
-): string | null {
+function getDeviceModelName(session: MentraSession): string | null {
   try {
-    // Access device.state from AppSession (SDK provides this)
-    const device = appSession.device as DeviceWithState | undefined;
-    const deviceState = device?.state;
-
-    logger?.debug(`[getDeviceModelName] device.state exists: ${!!deviceState}`);
-
-    if (deviceState?.modelName) {
-      // modelName is an Observable<string | null>
-      const modelNameObservable = deviceState.modelName as Observable<
-        string | null
-      >;
-      const modelName = modelNameObservable.value;
-      logger?.debug(
-        `[getDeviceModelName] device.state.modelName.value: ${modelName}`,
-      );
-      if (modelName) {
-        logger?.info(
-          `[getDeviceModelName] Found model via device.state.modelName.value: ${modelName}`,
-        );
-        return modelName;
-      }
-    }
-
-    logger?.warn(`[getDeviceModelName] No model name found in device.state`);
-  } catch (err) {
-    logger?.error(`[getDeviceModelName] Error: ${err}`);
+    return session.device.state.modelName.value ?? null;
+  } catch {
+    return null;
   }
-  return null;
-}
-
-/**
- * Subscribe to device model changes using SDK's Observable API
- * Returns cleanup function or null if subscription not available
- */
-function subscribeToDeviceModel(
-  appSession: AppSession,
-  callback: (modelName: string | null) => void,
-  logger?: UserSession["logger"],
-): (() => void) | null {
-  try {
-    // Access device.state from AppSession
-    const device = appSession.device as DeviceWithState | undefined;
-    const deviceState = device?.state;
-
-    logger?.debug(
-      `[subscribeToDeviceModel] device.state exists: ${!!deviceState}`,
-    );
-
-    if (deviceState?.modelName) {
-      const modelNameObservable = deviceState.modelName as Observable<
-        string | null
-      >;
-
-      logger?.debug(
-        `[subscribeToDeviceModel] device.state.modelName.onChange exists: ${!!modelNameObservable.onChange}`,
-      );
-
-      if (modelNameObservable.onChange) {
-        logger?.info(
-          `[subscribeToDeviceModel] Using device.state.modelName.onChange`,
-        );
-        // Observable.onChange returns a cleanup function
-        return modelNameObservable.onChange((value: string | null) => {
-          logger?.info(
-            `[subscribeToDeviceModel] 🔔 CALLBACK FIRED! modelName = ${value}`,
-          );
-          callback(value);
-        });
-      }
-    }
-
-    logger?.warn(`[subscribeToDeviceModel] No subscription method available`);
-  } catch (err) {
-    logger?.error(`[subscribeToDeviceModel] Error: ${err}`);
-  }
-  return null;
 }
 
 export class DisplayManager {
@@ -173,10 +87,7 @@ export class DisplayManager {
     this.logger = userSession.logger.child({ service: "DisplayManager" });
 
     // Detect initial device model
-    const initialModel = getDeviceModelName(
-      userSession.appSession,
-      this.logger,
-    );
+    const initialModel = getDeviceModelName(userSession.session);
     this.currentProfile = getProfileForModel(initialModel);
     this.currentDisplayWidthPx = this.currentProfile.displayWidthPx;
     this.currentMaxLines = this.currentProfile.maxLines;
@@ -212,30 +123,17 @@ export class DisplayManager {
    * Subscribe to device state changes to update profile when glasses change
    */
   private subscribeToDeviceChanges(): void {
-    // Use safe subscription helper that works with both old and new SDK
-    this.deviceStateCleanup = subscribeToDeviceModel(
-      this.userSession.appSession,
-      (modelName: string | null) => {
-        this.logger.info(`🔔 Device model callback received: ${modelName}`);
-        const newProfile = getProfileForModel(modelName);
-
-        if (newProfile.id !== this.currentProfile.id) {
-          this.logger.info(
-            `Device model changed: ${modelName} -> switching to profile ${newProfile.id}`,
-          );
-          this.updateProfile(newProfile);
-        } else {
-          this.logger.info(
-            `Device model ${modelName} maps to same profile ${newProfile.id}, no change needed`,
-          );
-        }
-      },
-      this.logger,
-    );
-
-    if (this.deviceStateCleanup) {
-      this.logger.info("Subscribed to device model changes");
-    } else {
+    try {
+      this.deviceStateCleanup =
+        this.userSession.session.device.state.modelName.onChange(
+          (modelName: string | null) => {
+            const newProfile = getProfileForModel(modelName);
+            if (newProfile.id !== this.currentProfile.id) {
+              this.updateProfile(newProfile);
+            }
+          },
+        );
+    } catch {
       this.logger.warn(
         "Device state subscription not available, using default profile",
       );
@@ -405,10 +303,7 @@ export class DisplayManager {
 
       // Send to glasses
       try {
-        this.userSession.appSession.layouts.showTextWall(cleaned, {
-          view: ViewType.MAIN,
-          durationMs: 20000,
-        });
+        this.userSession.session.display.showTextWall(cleaned);
       } catch (err) {
         this.logger.warn(
           { err },
@@ -476,10 +371,7 @@ export class DisplayManager {
 
     // Send to glasses
     try {
-      this.userSession.appSession.layouts.showTextWall(cleaned, {
-        view: ViewType.MAIN,
-        durationMs: isFinal ? 20000 : undefined,
-      });
+      this.userSession.session.display.showTextWall(cleaned);
     } catch (err) {
       this.logger.warn(
         { err },
@@ -533,10 +425,7 @@ export class DisplayManager {
 
       // Show empty state to clear the glasses display
       try {
-        this.userSession.appSession.layouts.showTextWall("", {
-          view: ViewType.MAIN,
-          durationMs: 1000,
-        });
+        this.userSession.session.display.clear();
       } catch (err) {
         this.logger.warn(
           { err },

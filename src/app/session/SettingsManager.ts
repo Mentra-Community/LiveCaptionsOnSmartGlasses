@@ -1,4 +1,4 @@
-import { UserSession } from "./UserSession";
+import type { UserSession } from "./UserSession";
 
 interface CaptionSettings {
   language: string;
@@ -9,14 +9,14 @@ interface CaptionSettings {
 }
 
 export class SettingsManager {
-  private readonly storage: UserSession["appSession"]["simpleStorage"];
+  private readonly storage: UserSession["session"]["storage"];
   private readonly logger: UserSession["logger"];
   private readonly userSession: UserSession;
   private readonly disposables: Array<() => void> = [];
 
   constructor(userSession: UserSession) {
     this.userSession = userSession;
-    this.storage = userSession.appSession.simpleStorage;
+    this.storage = userSession.session.storage;
     this.logger = userSession.logger.child({ service: "SettingsManager" });
   }
 
