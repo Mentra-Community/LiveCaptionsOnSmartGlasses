@@ -1,7 +1,7 @@
 "on":
   push:
     branches:
-      - feature/device-profile-detection
+      - sdk-v3-migration
 name: "[debug] Deploy captions-debug 🚀🧪"
 jobs:
   us-central:
