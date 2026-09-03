@@ -357,4 +357,4 @@ PORT=4000 bun run dev  # Uses 4000 and 4001
 
 ## License
 
-MIT
+Apache License 2.0
