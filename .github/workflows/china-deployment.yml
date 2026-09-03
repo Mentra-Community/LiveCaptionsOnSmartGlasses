@@ -1,0 +1,71 @@
+name: China Cloud Deployment
+
+on:
+  push:
+    branches: [china]
+
+jobs:
+  china-cloud-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      # 1. Checkout source code
+      - uses: actions/checkout@v4
+
+      # 2. Short commit SHA for tagging
+      - id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      # Create environment file with proper escaping
+      - name: Create environment file
+        run: |
+          cat > env.yaml << 'EOL'
+          - name: PACKAGE_NAME
+            value: "com.mentra.captions"
+          - name: DEPLOYMENT_REGION
+            value: "china"
+          - name: AUGMENTOS_API_KEY
+            value: "${{ secrets.CHINA_AUGMENTOS_API_KEY }}"
+          - name: MENTRAOS_API_KEY
+            value: "${{ secrets.CHINA_AUGMENTOS_API_KEY }}"
+          - name: PORT
+            value: "80"
+          - name: aliyun_logs_app
+            value: "stdout"
+          - name: aliyun_logs_app_project
+            value: "mentraos-prod-sls"
+          - name: aliyun_logs_app_logstore
+            value: "caption"
+          EOL
+
+      - name: Create container args file
+        run: |
+          cat > container-start-args.yaml << 'EOL'
+          - bun
+          - run
+          - start
+          EOL
+
+      # Deploy using the environment file
+      - uses: Mentra-Community/cloud-actions/deploy-app-alibaba@main
+        with:
+          environment: "prod"
+          alibaba-access-key-id: ${{ secrets.ALIBABA_ACCESS_KEY_ID }}
+          alibaba-access-key-secret: ${{ secrets.ALIBABA_ACCESS_KEY_SECRET }}
+          deployment-region: "cn-shenzhen"
+          app-name: "caption"
+          acr-instance-id: "cri-jqkk34lm32lg9ce7"
+          acr-vpc-domain: "mentra-acr-cnsz-a-registry-vpc.cn-shenzhen.cr.aliyuncs.com"
+          acr-public-domain: "mentra-acr-cnsz-a-registry.cn-shenzhen.cr.aliyuncs.com"
+          docker-context: "./"
+          dockerfile: "./docker/Dockerfile"
+          image-tag: ${{ steps.vars.outputs.sha_short }}
+          min-instances: 1
+          max-instances: 2
+          use-specs: "2.0-4.0Gi"
+          vswitch: "vsw-wz9ie55i32y0m8sguoum4,vsw-wz9448ykk5arq76y1m85q"
+          security-group: "sg-wz92n2ui7musjt04j79p"
+          env-yaml-file: "env.yaml"
+          container-start-args-file: "container-start-args.yaml"
